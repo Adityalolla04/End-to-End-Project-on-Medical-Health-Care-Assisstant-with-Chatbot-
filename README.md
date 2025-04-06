@@ -40,8 +40,3 @@ Developed using **LangChain, LlamaCpp, and Streamlit**, the solution emphasizes 
 ## 🧹 Conclusion
 
 This chatbot demonstrates how **AI can bridge healthcare data and patient interaction**, offering intelligent insights through structured NLP and ML pipelines. While intent classification and NER components are in early stages, the core system for **hospital length of stay prediction** and **data-driven medical assistance** is highly effective.
----
-
-## 👨‍💻 Developed by [Aditya Srivatsav](https://www.linkedin.com/in/adityasrivatsav/)
-
-Check out the full project: [GitHub Repo](https://github.com/Adityalolla04/End-to-End-Project-on-Medical--Health-Care-Assisstant-with.-Chatbot)
