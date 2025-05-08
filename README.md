@@ -6,9 +6,6 @@ This project presents an **AI-powered Medical Health Care Assistant Chatbot** th
 
 Developed using **LangChain, LlamaCpp, and Streamlit**, the solution emphasizes **on-device inference** for privacy and speed, without relying on cloud-based APIs.
 
----
-
-## ⚙️ Body
 
 ### ✅ Key Features
 - **Medical NLP Pipeline**: Preprocesses admission records, diagnostic summaries, and medications.
@@ -34,8 +31,6 @@ Developed using **LangChain, LlamaCpp, and Streamlit**, the solution emphasizes 
 - **LLM Build Failures on Mac M1**: Resolved by upgrading CMake and setting custom flags.
 - **Small Intent Classification Dataset**: Model underperformed due to limited training data (currently under development).
 - **Complex Medical Text Processing**: Addressed with tokenization, stopword filtering, and spaCy integration.
-
----
 
 ## 🧹 Conclusion
 
