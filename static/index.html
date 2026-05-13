@@ -799,11 +799,16 @@ Be concise, clinically accurate, and professional. Answer in 2-4 sentences unles
 const msgHistory=[{role:'system',content:SYSTEM_PROMPT}];
 
 async function checkStatus(){
-  // Check API
-  try{
-    const r=await fetch(`${API}/health`,{signal:AbortSignal.timeout(3000)});
-    apiOk=r.ok;
-  }catch{apiOk=false;}
+  // Always use /health as relative URL so it works both locally and on cloud
+  const healthUrl = IS_LOCAL ? `${API}/health` : '/health';
+  // Check API — retry up to 3 times with 5s timeout (handles slow HF cold starts)
+  for(let attempt=0;attempt<3&&!apiOk;attempt++){
+    try{
+      const r=await fetch(healthUrl,{signal:AbortSignal.timeout(5000)});
+      apiOk=r.ok;
+    }catch{apiOk=false;}
+    if(!apiOk && attempt<2) await new Promise(res=>setTimeout(res,2000));
+  }
   document.getElementById('api-dot').className='sb-dot '+(apiOk?'green':'red');
   document.getElementById('api-status').textContent='API: '+(apiOk?'Online':'Offline');
   document.getElementById('tb-badge').textContent=apiOk?'● LIVE':'● OFFLINE';
@@ -977,7 +982,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   updateKPIs();
   renderDashboard();
   renderTable();
-  checkStatus();
+  // Delay status check to allow server warm-up on HF Spaces
+  setTimeout(checkStatus, IS_LOCAL ? 500 : 3000);
   setInterval(checkStatus,30000);
 });
 </script>
