@@ -177,42 +177,69 @@ class MedicalRAGPipeline:
         try:
             import pandas as pd
             df_adm = pd.read_csv(settings.ADMISSION_CSV)
-            df_los = pd.read_csv(settings.HOSPITAL_LOS_CSV)
+            df_los  = pd.read_csv(settings.HOSPITAL_LOS_CSV)
             df = df_adm.merge(df_los, left_on="id", right_on="parent_id", how="inner")
 
-            total = len(df)
-            male = df[df["sex"].str.lower() == "male"]
-            female = df[df["sex"].str.lower() == "female"]
+            total   = len(df)
+            male    = df[df["sex"].str.strip().str.lower() == "male"]
+            female  = df[df["sex"].str.strip().str.lower() == "female"]
 
-            def pct(n, d): return f"{n} ({round(n/d*100,1)}%)" if d else "0"
+            def pct(n, d):
+                return f"{int(n)} ({round(n / d * 100, 1)}%)" if d else "0"
 
+            def safe_mean(series):
+                v = pd.to_numeric(series, errors="coerce").mean()
+                return round(float(v), 1) if not pd.isna(v) else "N/A"
+
+            # Overall
+            total_icu = (df["admission_disposition"].str.upper() == "ICU").sum()
+            total_exp = (df["did_the_patient_expire_in_hospital"].astype(str).str.lower() == "yes").sum()
+            avg_los   = safe_mean(df["hospital_length_of_stay"])
+            avg_icu   = safe_mean(df["icu_length_of_stay"])
+
+            # Male
             m_icu = (male["admission_disposition"].str.upper() == "ICU").sum()
+            m_exp = (male["did_the_patient_expire_in_hospital"].astype(str).str.lower() == "yes").sum()
+            m_los = safe_mean(male["hospital_length_of_stay"])
+            m_icu_los = safe_mean(male["icu_length_of_stay"])
+            m_age = safe_mean(male["age"])
+
+            # Female
             f_icu = (female["admission_disposition"].str.upper() == "ICU").sum()
-            m_exp = (male.get("did_the_patient_expire_in_hospital", pd.Series(dtype=str)).str.lower() == "yes").sum()
-            f_exp = (female.get("did_the_patient_expire_in_hospital", pd.Series(dtype=str)).str.lower() == "yes").sum()
-            m_los = pd.to_numeric(male.get("hospital_length_of_stay", pd.Series(dtype=float)), errors="coerce").mean()
-            f_los = pd.to_numeric(female.get("hospital_length_of_stay", pd.Series(dtype=float)), errors="coerce").mean()
-            m_age = pd.to_numeric(male.get("age", pd.Series(dtype=float)), errors="coerce").mean()
-            f_age = pd.to_numeric(female.get("age", pd.Series(dtype=float)), errors="coerce").mean()
+            f_exp = (female["did_the_patient_expire_in_hospital"].astype(str).str.lower() == "yes").sum()
+            f_los = safe_mean(female["hospital_length_of_stay"])
+            f_icu_los = safe_mean(female["icu_length_of_stay"])
+            f_age = safe_mean(female["age"])
 
-            stats = f"""AGGREGATE STATISTICS FROM FULL DATASET ({total} patients):
+            stats = f"""AGGREGATE STATISTICS — FULL DATASET ({total} patients, Canada Hospital 1, COVID-19 2020-21):
 
-OVERALL:
-- Total patients: {total} | Male: {len(male)} ({round(len(male)/total*100,1)}%) | Female: {len(female)} ({round(len(female)/total*100,1)}%)
-- ICU admissions: {(df['admission_disposition'].str.upper()=='ICU').sum()} total
-- Avg hospital LoS: {round(pd.to_numeric(df_los.get('hospital_length_of_stay', pd.Series(dtype=float)), errors='coerce').mean(), 1)} days
+OVERALL COHORT:
+- Total patients: {total}
+- Male: {pct(len(male), total)} | Female: {pct(len(female), total)}
+- ICU admissions: {pct(total_icu, total)}
+- In-hospital mortality: {pct(total_exp, total)}
+- Avg hospital length of stay: {avg_los} days
+- Avg ICU length of stay: {avg_icu} days
 
-MALE PATIENTS ({len(male)} total):
-- Avg age: {round(m_age,1) if not pd.isna(m_age) else 'N/A'} years
+MALE PATIENTS ({len(male)} total, {round(len(male)/total*100,1)}%):
+- Average age: {m_age} years
 - ICU admissions: {pct(m_icu, len(male))}
 - In-hospital mortality: {pct(m_exp, len(male))}
-- Avg hospital LoS: {round(m_los,1) if not pd.isna(m_los) else 'N/A'} days
+- Avg hospital LoS: {m_los} days
+- Avg ICU LoS: {m_icu_los} days
 
-FEMALE PATIENTS ({len(female)} total):
-- Avg age: {round(f_age,1) if not pd.isna(f_age) else 'N/A'} years
+FEMALE PATIENTS ({len(female)} total, {round(len(female)/total*100,1)}%):
+- Average age: {f_age} years
 - ICU admissions: {pct(f_icu, len(female))}
 - In-hospital mortality: {pct(f_exp, len(female))}
-- Avg hospital LoS: {round(f_los,1) if not pd.isna(f_los) else 'N/A'} days
+- Avg hospital LoS: {f_los} days
+- Avg ICU LoS: {f_icu_los} days
+
+KEY COMPARISON (Male vs Female):
+- Mortality: {round(m_exp/len(male)*100,1)}% male vs {round(f_exp/len(female)*100,1)}% female
+- ICU rate: {round(m_icu/len(male)*100,1)}% male vs {round(f_icu/len(female)*100,1)}% female
+- Avg age: {m_age} male vs {f_age} female (females slightly older)
+- Avg LoS: {m_los}d male vs {f_los}d female
 """
             return stats
         except Exception as e:
