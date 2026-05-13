@@ -1,0 +1,71 @@
+name: CI/CD — Medical Chatbot
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Lint & Test ─────────────────────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install ruff pytest httpx pytest-asyncio pydantic pydantic-settings pandas numpy scikit-learn joblib python-dotenv fastapi uvicorn
+
+      - name: Lint with ruff
+        run: ruff check . --ignore E501
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+        env:
+          LLM_PROVIDER: "mock"   # use mock LLM in CI
+
+  # ── Build & Push Docker image ────────────────────────────────────────────────
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: deployment/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/medical-chatbot:latest
+            ghcr.io/${{ github.repository_owner }}/medical-chatbot:${{ github.sha }}
+
+  # ── Deploy to Render (optional) ──────────────────────────────────────────────
+  # Uncomment and add RENDER_API_KEY + RENDER_SERVICE_ID to GitHub Secrets
+  # deploy:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - name: Trigger Render Deploy
+  #       run: |
+  #         curl -X POST https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys \
+  #           -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+  #           -H "Content-Type: application/json"

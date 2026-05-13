@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MedBI — Medical Intelligence Platform</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ── DESIGN TOKENS ─────────────────────────────────────── */
+:root{
+  --bg:#0d0d0d;--bg2:#141414;--bg3:#1a1a1a;--bg4:#202020;--bg5:#262626;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
+  --accent:#10a37f;--accent2:#19c37d;--accent3:#1a7f64;
+  --blue:#2d7dd2;--red:#ef4444;--amber:#f59e0b;--purple:#8b5cf6;
+  --text:#ececec;--text2:#8e8ea0;--text3:#565869;
+  --font:'Söhne','ui-sans-serif','system-ui',-apple-system,sans-serif;
+  --sidebar:260px;--topbar:56px;--radius:12px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;overflow:hidden}
+
+/* ── LAYOUT ──────────────────────────────────────────── */
+#app{display:flex;height:100vh}
+#sidebar{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:width .2s;overflow:hidden;z-index:30}
+#sidebar.collapsed{width:0;min-width:0}
+#main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+#topbar{height:var(--topbar);min-height:var(--topbar);background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0}
+#view{flex:1;overflow-y:auto;position:relative}
+
+/* ── SIDEBAR ─────────────────────────────────────────── */
+.sb-logo{height:56px;display:flex;align-items:center;padding:0 16px;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-logo-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.sb-logo-text{font-size:16px;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
+.sb-logo-text b{color:var(--accent2)}
+.sb-nav{flex:1;padding:8px;overflow-y:auto}
+.sb-nav-section{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;padding:14px 8px 4px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;color:var(--text2);transition:all .15s;border:1px solid transparent;white-space:nowrap;overflow:hidden}
+.sb-item:hover{background:var(--bg4);color:var(--text)}
+.sb-item.active{background:var(--bg4);color:var(--text);border-color:var(--border)}
+.sb-item .sb-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0}
+.sb-item .sb-label{font-size:13px;font-weight:500}
+.sb-badge{margin-left:auto;background:var(--accent3);color:#fff;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:600}
+.sb-footer{padding:10px;border-top:1px solid var(--border);flex-shrink:0}
+.sb-model-box{background:var(--bg4);border:1px solid var(--border2);border-radius:8px;padding:10px 12px}
+.sb-model-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-weight:600}
+.sb-model-select{background:var(--bg5);border:1px solid var(--border2);color:var(--text);padding:5px 8px;border-radius:6px;font-size:12px;width:100%;cursor:pointer}
+.sb-model-select:focus{outline:none;border-color:var(--accent)}
+.sb-status{display:flex;align-items:center;gap:7px;padding:8px 12px;font-size:12px;color:var(--text2)}
+.sb-dot{width:8px;height:8px;border-radius:50%;background:var(--text3)}
+.sb-dot.green{background:var(--accent2)}
+.sb-dot.red{background:var(--red)}
+
+/* ── TOPBAR ─────────────────────────────────────────── */
+.tb-menu-btn{width:34px;height:34px;background:none;border:1px solid var(--border);color:var(--text2);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:all .15s;flex-shrink:0}
+.tb-menu-btn:hover{background:var(--bg4);color:var(--text)}
+.tb-title{font-size:15px;font-weight:600;color:var(--text);flex:1}
+.tb-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(16,163,127,.15);color:var(--accent2);border:1px solid rgba(16,163,127,.25)}
+.tb-time{font-size:12px;color:var(--text3)}
+.tb-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s}
+.tb-btn:hover{background:var(--bg4);color:var(--text)}
+
+/* ── VIEWS ────────────────────────────────────────────── */
+.view-panel{display:none;padding:20px;animation:fadeIn .2s ease}
+.view-panel.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── DASHBOARD ────────────────────────────────────────── */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;overflow:hidden;transition:border-color .15s,transform .15s;cursor:default}
+.kpi:hover{border-color:var(--border2);transform:translateY(-1px)}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent)}
+.kpi.red::after{background:var(--red)}
+.kpi.amber::after{background:var(--amber)}
+.kpi.blue::after{background:var(--blue)}
+.kpi.purple::after{background:var(--purple)}
+.kpi.cyan::after{background:#06b6d4}
+.kpi-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:8px}
+.kpi-val{font-size:28px;font-weight:700;line-height:1;margin-bottom:4px}
+.kpi-sub{font-size:11px;color:var(--text2)}
+.kpi .kpi-icon{position:absolute;right:14px;top:14px;font-size:20px;opacity:.25}
+
+.charts-grid{display:grid;gap:10px;margin-bottom:16px}
+.charts-2{grid-template-columns:1fr 1fr}
+.charts-3{grid-template-columns:1fr 1fr 1fr}
+.charts-2-1{grid-template-columns:2fr 1fr}
+.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:border-color .15s}
+.chart-card:hover{border-color:var(--border2)}
+.chart-card.span2{grid-column:span 2}
+.cc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px}
+.cc-title{font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.4px}
+.cc-sub{font-size:11px;color:var(--text3);margin-top:1px}
+.cc-tabs{display:flex;gap:3px}
+.cc-tab{background:none;border:1px solid var(--border);color:var(--text3);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:600;transition:all .15s}
+.cc-tab.active,.cc-tab:hover{background:var(--bg4);color:var(--text);border-color:var(--border2)}
+
+/* ── PATIENT TABLE ─────────────────────────────────────── */
+.pt-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px}
+.pt-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pt-search{background:var(--bg4);border:1px solid var(--border2);color:var(--text);padding:7px 12px;border-radius:8px;font-size:13px;width:220px;transition:border-color .15s}
+.pt-search:focus{outline:none;border-color:var(--accent)}
+.pt-scroll{overflow-x:auto;max-height:460px;overflow-y:auto}
+table{width:100%;border-collapse:collapse}
+thead th{padding:10px 14px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;background:var(--bg3);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;transition:color .15s}
+thead th:hover{color:var(--text)}
+thead th.sorted{color:var(--accent2)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:hover{background:var(--bg3)}
+tbody td{padding:9px 14px;font-size:13px;color:var(--text2)}
+tbody td:first-child{color:var(--text);font-weight:600}
+.badge-pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase}
+.bp-icu{background:rgba(239,68,68,.18);color:#f87171}
+.bp-ward{background:rgba(16,163,127,.15);color:#34d399}
+.bp-dead{background:rgba(239,68,68,.2);color:#f87171}
+.bp-alive{background:rgba(16,163,127,.15);color:#34d399}
+.pt-footer{padding:10px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.pager{display:flex;gap:4px}
+.pager button{background:var(--bg3);border:1px solid var(--border);color:var(--text2);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:11px;transition:all .15s}
+.pager button:hover,.pager button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pager button:disabled{opacity:.3;cursor:not-allowed}
+
+/* ── CHAT ──────────────────────────────────────────────── */
+#chat-view{display:none;height:calc(100vh - var(--topbar));flex-direction:column}
+#chat-view.active{display:flex}
+.chat-wrap{display:flex;flex:1;overflow:hidden}
+.chat-qs{width:240px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.qs-section{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.qs-item{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;color:var(--text2);cursor:pointer;transition:all .15s;line-height:1.45}
+.qs-item:hover{background:var(--bg4);color:var(--text);border-color:var(--accent)}
+.chat-main{flex:1;display:flex;flex-direction:column;max-width:860px;margin:0 auto;width:100%;padding:0 20px}
+#messages{flex:1;overflow-y:auto;padding:20px 0;display:flex;flex-direction:column;gap:20px}
+.msg-row{display:flex;gap:12px;align-items:flex-start;animation:msgIn .18s ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.msg-row.user{flex-direction:row-reverse}
+.msg-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+.msg-avatar.bot{background:var(--accent);color:#fff}
+.msg-avatar.user-av{background:var(--bg4);border:1px solid var(--border2);font-size:13px;color:var(--text)}
+.msg-bubble{max-width:80%;background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:12px 16px;font-size:14px;line-height:1.65;color:var(--text)}
+.msg-row.user .msg-bubble{background:var(--bg4);border-color:var(--border2)}
+.msg-bubble.thinking{color:var(--text3)}
+.dot-anim span{animation:dotBlink 1.4s infinite;display:inline-block;font-size:18px;line-height:1}
+.dot-anim span:nth-child(2){animation-delay:.2s}
+.dot-anim span:nth-child(3){animation-delay:.4s}
+@keyframes dotBlink{0%,80%,100%{opacity:.15}40%{opacity:1}}
+.msg-sources{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--text3)}
+.chat-input-row{padding:16px 0 20px;display:flex;flex-direction:column;gap:8px}
+.input-box{background:var(--bg3);border:1px solid var(--border2);border-radius:14px;padding:14px 16px;display:flex;align-items:flex-end;gap:10px;transition:border-color .15s}
+.input-box:focus-within{border-color:var(--accent)}
+#chat-input{flex:1;background:none;border:none;color:var(--text);font-size:14px;resize:none;max-height:150px;overflow-y:auto;line-height:1.55;font-family:inherit}
+#chat-input:focus{outline:none}
+#chat-input::placeholder{color:var(--text3)}
+.send-btn{width:34px;height:34px;background:var(--accent);border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;flex-shrink:0;transition:background .15s}
+.send-btn:hover{background:var(--accent2)}
+.send-btn:disabled{background:var(--bg4);color:var(--text3);cursor:not-allowed}
+.chat-hint{font-size:11px;color:var(--text3);text-align:center}
+.chat-hint a{color:var(--accent);text-decoration:none}
+.ollama-bar{background:rgba(16,163,127,.08);border:1px solid rgba(16,163,127,.2);border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;flex-shrink:0;margin:0}
+.ollama-bar.offline{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2)}
+
+/* ── MISC ────────────────────────────────────────────── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bg5);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#333}
+.divider{height:1px;background:var(--border);margin:8px 0}
+.text-accent{color:var(--accent2)}
+.text-red{color:var(--red)}
+.text-amber{color:var(--amber)}
+.text-blue{color:var(--blue)}
+.text-purple{color:var(--purple)}
+@media(max-width:768px){
+  #sidebar{display:none}
+  .charts-2,.charts-3,.charts-2-1{grid-template-columns:1fr}
+  .chart-card.span2{grid-column:auto}
+  .chat-qs{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ── SIDEBAR ──────────────────────────────────────── -->
+<div id="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-icon">🏥</div>
+    <div class="sb-logo-text">Med<b>BI</b></div>
+  </div>
+  <div class="sb-nav">
+    <div class="sb-nav-section">Analytics</div>
+    <div class="sb-item active" onclick="showView('dashboard',this)"><span class="sb-icon">📊</span><span class="sb-label">Dashboard</span></div>
+    <div class="sb-item" onclick="showView('patients',this)"><span class="sb-icon">👥</span><span class="sb-label">Patient Explorer</span></div>
+    <div class="sb-item" onclick="showView('clinical',this)"><span class="sb-icon">🏥</span><span class="sb-label">Clinical Outcomes</span></div>
+    <div class="sb-nav-section">Intelligence</div>
+    <div class="sb-item" onclick="showView('chat',this)"><span class="sb-icon">🤖</span><span class="sb-label">AI Assistant</span><span class="sb-badge">RAG</span></div>
+    <div class="sb-item" onclick="showView('predict',this)"><span class="sb-icon">📈</span><span class="sb-label">LoS Predictor</span></div>
+    <div class="sb-nav-section">Info</div>
+    <div class="sb-item" onclick="showView('architecture',this)"><span class="sb-icon">🔧</span><span class="sb-label">Architecture</span></div>
+  </div>
+  <div class="sb-footer">
+    <div class="sb-model-box">
+      <div class="sb-model-label">🤖 Ollama Model</div>
+      <select class="sb-model-select" id="ollama-model">
+        <option value="llama3.2:3b">llama3.2:3b</option>
+        <option value="llama3:8b">llama3:8b</option>
+        <option value="mistral:7b">mistral:7b</option>
+        <option value="gemma3:4b">gemma3:4b</option>
+        <option value="phi3:mini">phi3:mini</option>
+        <option value="MiniMaxAI/MiniMax-Text-01">MiniMax-Text-01</option>
+        <option value="custom">Custom…</option>
+      </select>
+    </div>
+    <div style="height:8px"></div>
+    <div class="sb-status">
+      <div class="sb-dot" id="api-dot"></div>
+      <span id="api-status">API: checking…</span>
+    </div>
+    <div class="sb-status">
+      <div class="sb-dot" id="ollama-dot"></div>
+      <span id="ollama-status">Ollama: checking…</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN ──────────────────────────────────────────── -->
+<div id="main">
+  <div id="topbar">
+    <button class="tb-menu-btn" onclick="toggleSidebar()">☰</button>
+    <span class="tb-title" id="tb-title">Dashboard</span>
+    <span class="tb-badge" id="tb-badge">● LIVE</span>
+    <span class="tb-time" id="tb-time"></span>
+    <button class="tb-btn" onclick="exportCSV()">⬇ Export</button>
+    <button class="tb-btn" onclick="refreshAll()">↻ Refresh</button>
+  </div>
+
+  <!-- ═══ DASHBOARD VIEW ══════════════════════════════ -->
+  <div id="view" style="overflow-y:auto">
+
+  <div class="view-panel active" id="v-dashboard">
+    <div class="kpi-row" id="kpi-row">
+      <div class="kpi"><span class="kpi-icon">🏥</span><div class="kpi-label">Total Patients</div><div class="kpi-val" id="k-total">508</div><div class="kpi-sub">COVID-19 Inpatients</div></div>
+      <div class="kpi"><span class="kpi-icon">✅</span><div class="kpi-label">Survived</div><div class="kpi-val text-accent" id="k-survived">418</div><div class="kpi-sub" id="k-surv-pct">82.3% survival</div></div>
+      <div class="kpi red"><span class="kpi-icon">📉</span><div class="kpi-label">Mortality</div><div class="kpi-val text-red" id="k-expired">90</div><div class="kpi-sub" id="k-mort-pct">17.7% rate</div></div>
+      <div class="kpi amber"><span class="kpi-icon">🚨</span><div class="kpi-label">ICU Admissions</div><div class="kpi-val text-amber" id="k-icu">43</div><div class="kpi-sub" id="k-icu-pct">8.5% of total</div></div>
+      <div class="kpi blue"><span class="kpi-icon">📅</span><div class="kpi-label">Avg Hospital LoS</div><div class="kpi-val text-blue" id="k-los">12.4</div><div class="kpi-sub">days per patient</div></div>
+      <div class="kpi purple"><span class="kpi-icon">🫁</span><div class="kpi-label">Intubated</div><div class="kpi-val" style="color:var(--purple)" id="k-intub">—</div><div class="kpi-sub" id="k-intub-pct">mechanical ventilation</div></div>
+    </div>
+
+    <div class="charts-grid charts-2">
+      <div class="chart-card">
+        <div class="cc-head">
+          <div><div class="cc-title">Admission Disposition</div><div class="cc-sub">ICU vs Ward</div></div>
+          <div class="cc-tabs">
+            <button class="cc-tab active" onclick="switchChart('disp','doughnut',this)">Donut</button>
+            <button class="cc-tab" onclick="switchChart('disp','bar',this)">Bar</button>
+          </div>
+        </div>
+        <div style="height:200px"><canvas id="c-disp"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="cc-head">
+          <div><div class="cc-title">Patient Outcomes</div><div class="cc-sub">Survived vs Expired</div></div>
+          <div class="cc-tabs">
+            <button class="cc-tab active" onclick="switchChart('outcome','doughnut',this)">Donut</button>
+            <button class="cc-tab" onclick="switchChart('outcome','bar',this)">Bar</button>
+          </div>
+        </div>
+        <div style="height:200px"><canvas id="c-outcome"></canvas></div>
+      </div>
+    </div>
+
+    <div class="charts-grid charts-2">
+      <div class="chart-card">
+        <div class="cc-head"><div><div class="cc-title">Age Distribution</div><div class="cc-sub">Patients by decade</div></div></div>
+        <div style="height:200px"><canvas id="c-age"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="cc-head"><div><div class="cc-title">Sex × Disposition</div><div class="cc-sub">Male / Female split</div></div></div>
+        <div style="height:200px"><canvas id="c-sex"></canvas></div>
+      </div>
+    </div>
+
+    <div class="charts-grid charts-2-1">
+      <div class="chart-card">
+        <div class="cc-head"><div><div class="cc-title">Hospital Length of Stay</div><div class="cc-sub">Distribution histogram</div></div></div>
+        <div style="height:190px"><canvas id="c-los"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="cc-head"><div><div class="cc-title">Top Diagnoses</div><div class="cc-sub">Primary admission reason</div></div></div>
+        <div style="height:190px"><canvas id="c-dx"></canvas></div>
+      </div>
+    </div>
+
+    <div class="charts-grid charts-2">
+      <div class="chart-card">
+        <div class="cc-head"><div><div class="cc-title">ICU vs Ward Outcomes</div><div class="cc-sub">Mortality comparison</div></div></div>
+        <div style="height:180px"><canvas id="c-icu-mort"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="cc-head"><div><div class="cc-title">SpO₂ on Admission</div><div class="cc-sub">Oxygen saturation distribution</div></div></div>
+        <div style="height:180px"><canvas id="c-spo2"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PATIENTS VIEW ════════════════════════════════ -->
+  <div class="view-panel" id="v-patients">
+    <div class="pt-wrap">
+      <div class="pt-head">
+        <span style="font-weight:700;font-size:14px">Patient Records — <span id="pt-count">508</span></span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="pt-search" style="width:130px" id="f-disp" onchange="filterTable()">
+            <option value="">All Dispositions</option>
+            <option value="ICU">ICU</option>
+            <option value="WARD">Ward</option>
+          </select>
+          <select class="pt-search" style="width:110px" id="f-sex" onchange="filterTable()">
+            <option value="">All Sex</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+          <input type="text" class="pt-search" placeholder="Search…" id="pt-search" oninput="filterTable()">
+        </div>
+      </div>
+      <div class="pt-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortPt('id')">ID ↕</th>
+              <th onclick="sortPt('age')">Age ↕</th>
+              <th>Sex</th>
+              <th>Disposition</th>
+              <th onclick="sortPt('los')">LoS ↕</th>
+              <th>Outcome</th>
+              <th>Intubated</th>
+              <th onclick="sortPt('spo2')">SpO₂ ↕</th>
+              <th>Primary Dx</th>
+            </tr>
+          </thead>
+          <tbody id="pt-body"></tbody>
+        </table>
+      </div>
+      <div class="pt-footer">
+        <span id="pt-footer" style="color:var(--text3);font-size:12px"></span>
+        <div class="pager" id="pt-pager"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CLINICAL VIEW ════════════════════════════════ -->
+  <div class="view-panel" id="v-clinical">
+    <div class="kpi-row">
+      <div class="kpi red"><div class="kpi-label">Overall Mortality</div><div class="kpi-val text-red" id="clin-mort">17.7%</div><div class="kpi-sub" id="clin-mort-n">90 of 508</div></div>
+      <div class="kpi amber"><div class="kpi-label">ICU Mortality</div><div class="kpi-val text-amber" id="clin-icu-mort">—</div><div class="kpi-sub">ICU patients expired</div></div>
+      <div class="kpi"><div class="kpi-label">Ward Mortality</div><div class="kpi-val text-blue" id="clin-ward-mort">—</div><div class="kpi-sub">Ward patients expired</div></div>
+      <div class="kpi purple"><div class="kpi-label">Intubated</div><div class="kpi-val" style="color:var(--purple)" id="clin-intub">—</div><div class="kpi-sub" id="clin-intub-pct">—</div></div>
+      <div class="kpi"><div class="kpi-label">Median LoS</div><div class="kpi-val text-accent" id="clin-med-los">8</div><div class="kpi-sub">days (hospital)</div></div>
+      <div class="kpi cyan"><div class="kpi-label">Avg ICU LoS</div><div class="kpi-val" style="color:#06b6d4" id="clin-icu-los">12.6</div><div class="kpi-sub">days (ICU only)</div></div>
+    </div>
+    <div class="charts-grid charts-2">
+      <div class="chart-card">
+        <div class="cc-head"><div><div class="cc-title">LoS Distribution</div><div class="cc-sub">Days in hospital</div></div></div>
+        <div style="height:220px"><canvas id="c-los2"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="cc-head"><div><div class="cc-title">Age vs LoS</div><div class="cc-sub">Scatter by disposition</div></div></div>
+        <div style="height:220px"><canvas id="c-scatter"></canvas></div>
+      </div>
+    </div>
+    <div class="charts-grid charts-2">
+      <div class="chart-card">
+        <div class="cc-head"><div><div class="cc-title">Avg LoS by Age Group</div><div class="cc-sub">Hospital stay per decade</div></div></div>
+        <div style="height:200px"><canvas id="c-los-age"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="cc-head"><div><div class="cc-title">Sex × Outcome</div><div class="cc-sub">Mortality by sex</div></div></div>
+        <div style="height:200px"><canvas id="c-sex-out"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PREDICT VIEW ═════════════════════════════════ -->
+  <div class="view-panel" id="v-predict">
+    <div style="max-width:680px">
+      <h5 style="margin-bottom:16px;color:var(--text);font-weight:700">🔮 Hospital Length-of-Stay Predictor</h5>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px">
+        <div class="row g-3" id="predict-form">
+          <div class="col-6"><label class="form-label" style="font-size:12px;color:var(--text3)">Age</label><input type="number" class="form-control form-control-sm" id="p-age" value="65" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text)"></div>
+          <div class="col-6"><label class="form-label" style="font-size:12px;color:var(--text3)">Sex</label><select class="form-select form-select-sm" id="p-sex" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text)"><option value="0">Female</option><option value="1">Male</option></select></div>
+          <div class="col-6"><label class="form-label" style="font-size:12px;color:var(--text3)">Systolic BP (mmHg)</label><input type="number" class="form-control form-control-sm" id="p-sbp" value="130" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text)"></div>
+          <div class="col-6"><label class="form-label" style="font-size:12px;color:var(--text3)">Diastolic BP (mmHg)</label><input type="number" class="form-control form-control-sm" id="p-dbp" value="80" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text)"></div>
+          <div class="col-4"><label class="form-label" style="font-size:12px;color:var(--text3)">Heart Rate (bpm)</label><input type="number" class="form-control form-control-sm" id="p-hr" value="90" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text)"></div>
+          <div class="col-4"><label class="form-label" style="font-size:12px;color:var(--text3)">Respiratory Rate</label><input type="number" class="form-control form-control-sm" id="p-rr" value="18" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text)"></div>
+          <div class="col-4"><label class="form-label" style="font-size:12px;color:var(--text3)">SpO₂ (%)</label><input type="number" class="form-control form-control-sm" id="p-spo2" value="95" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text)"></div>
+          <div class="col-4"><label class="form-label" style="font-size:12px;color:var(--text3)">Temperature (°C)</label><input type="number" class="form-control form-control-sm" id="p-temp" value="37.5" step="0.1" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text)"></div>
+          <div class="col-4"><label class="form-label" style="font-size:12px;color:var(--text3)">ICU Admission</label><select class="form-select form-select-sm" id="p-icu" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text)"><option value="0">Ward</option><option value="1">ICU</option></select></div>
+          <div class="col-4"><label class="form-label" style="font-size:12px;color:var(--text3)">Intubated</label><select class="form-select form-select-sm" id="p-intub" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text)"><option value="0">No</option><option value="1">Yes</option></select></div>
+        </div>
+        <div style="margin-top:16px">
+          <button onclick="runPredict()" style="background:var(--accent);border:none;color:#fff;padding:9px 24px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;transition:background .15s" onmouseover="this.style.background='var(--accent2)'" onmouseout="this.style.background='var(--accent)'">🔮 Predict LoS</button>
+        </div>
+      </div>
+      <div id="predict-result" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px"></div>
+    </div>
+  </div>
+
+  <!-- ═══ ARCHITECTURE VIEW ════════════════════════════ -->
+  <div class="view-panel" id="v-architecture">
+    <div style="max-width:800px">
+      <h5 style="color:var(--text);font-weight:700;margin-bottom:16px">🔧 System Architecture</h5>
+      <div class="charts-grid" style="grid-template-columns:1fr;gap:10px">
+        <div class="chart-card">
+          <div class="cc-title" style="margin-bottom:12px">RAG Pipeline Flow</div>
+          <div style="font-size:13px;color:var(--text2);line-height:2">
+            <div>📝 <b style="color:var(--text)">User Query</b> → Intent Classification</div>
+            <div style="padding-left:20px;color:var(--text3)">↓</div>
+            <div>🔍 <b style="color:var(--text)">ChromaDB Retrieval</b> → Top-K similar patient records</div>
+            <div style="padding-left:20px;color:var(--text3)">↓</div>
+            <div>🧠 <b style="color:var(--text)">LLM Generation</b> → Context-augmented answer</div>
+            <div style="padding-left:20px;color:var(--text3)">↓</div>
+            <div>📊 <b style="color:var(--text)">Response</b> → Answer + sources + intent</div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="cc-title" style="margin-bottom:12px">Tech Stack</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
+            <div><b style="color:var(--accent2)">Backend</b><br><span style="color:var(--text2)">FastAPI · Python 3.12<br>Pydantic v2 · uvicorn</span></div>
+            <div><b style="color:var(--accent2)">RAG</b><br><span style="color:var(--text2)">LangChain · ChromaDB<br>HuggingFace all-MiniLM-L6</span></div>
+            <div><b style="color:var(--accent2)">AI Chat</b><br><span style="color:var(--text2)">Ollama local inference<br>Llama3 / Mistral / Gemma</span></div>
+            <div><b style="color:var(--accent2)">Frontend</b><br><span style="color:var(--text2)">Bootstrap 5 · Chart.js<br>Pure HTML/CSS/JS</span></div>
+            <div><b style="color:var(--accent2)">Data</b><br><span style="color:var(--text2)">508 COVID-19 patients<br>Canada Hospital 1 · 2020-21</span></div>
+            <div><b style="color:var(--accent2)">ML Model</b><br><span style="color:var(--text2)">Random Forest LoS predictor<br>R²=0.99 on test set</span></div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="cc-title" style="margin-bottom:12px">API Endpoints</div>
+          <div style="font-family:monospace;font-size:12px;color:var(--text2);line-height:2.2">
+            <div><span style="color:#06b6d4">GET</span>  &nbsp;/health &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text3)">→ API status</span></div>
+            <div><span style="color:var(--accent2)">POST</span> /api/chat &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text3)">→ RAG chatbot</span></div>
+            <div><span style="color:#06b6d4">GET</span>  &nbsp;/api/analytics/summary &nbsp;<span style="color:var(--text3)">→ Dataset stats</span></div>
+            <div><span style="color:#06b6d4">GET</span>  &nbsp;/api/patients &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text3)">→ Patient list</span></div>
+            <div><span style="color:#06b6d4">GET</span>  &nbsp;/api/patients/{id} &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text3)">→ Patient detail</span></div>
+            <div><span style="color:var(--accent2)">POST</span> /api/predict/los &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text3)">→ LoS prediction</span></div>
+            <div><span style="color:#06b6d4">GET</span>  &nbsp;/api/medications/search  <span style="color:var(--text3)">→ Semantic search</span></div>
+            <div><span style="color:#f59e0b">WS</span> &nbsp;&nbsp;/ws/chat &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text3)">→ Streaming chat</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /#view (non-chat) -->
+
+  <!-- ═══ CHAT VIEW (full-height flex) ════════════════ -->
+  <div id="chat-view">
+    <div class="chat-wrap">
+      <div class="chat-qs">
+        <div>
+          <div class="qs-section">📋 Clinical</div>
+          <div class="qs-item" onclick="qs(this)">What is the overall mortality rate?</div>
+          <div class="qs-item" onclick="qs(this)">How many ICU patients are there?</div>
+          <div class="qs-item" onclick="qs(this)">What is the average hospital LoS?</div>
+        </div>
+        <div>
+          <div class="qs-section">💊 Medications</div>
+          <div class="qs-item" onclick="qs(this)">What medications are commonly prescribed?</div>
+          <div class="qs-item" onclick="qs(this)">Tell me about dexamethasone in COVID</div>
+          <div class="qs-item" onclick="qs(this)">What is remdesivir used for?</div>
+        </div>
+        <div>
+          <div class="qs-section">👥 Demographics</div>
+          <div class="qs-item" onclick="qs(this)">Compare male vs female outcomes</div>
+          <div class="qs-item" onclick="qs(this)">What is the age distribution?</div>
+          <div class="qs-item" onclick="qs(this)">What comorbidities are most common?</div>
+        </div>
+        <div>
+          <div class="qs-section">🔍 Patients</div>
+          <div class="qs-item" onclick="qs(this)">Tell me about patient 1</div>
+          <div class="qs-item" onclick="qs(this)">Which patients were intubated?</div>
+          <div class="qs-item" onclick="qs(this)">Summarize the dataset for me</div>
+        </div>
+      </div>
+      <div class="chat-main">
+        <div id="messages">
+          <div class="msg-row">
+            <div class="msg-avatar bot">🏥</div>
+            <div class="msg-bubble">
+              <b>Hello! I'm your Medical AI Assistant</b> powered by RAG + Ollama local inference.<br><br>
+              I have full access to <b>508 COVID-19 inpatient records</b> from Canada Hospital 1. I can answer questions about patient outcomes, medications, demographics, and clinical statistics.<br><br>
+              <span style="color:var(--text3);font-size:12px">💡 Pick a suggested question from the sidebar, or type your own below. When Ollama is running, I use your local model for intelligent responses.</span>
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-row">
+          <div class="ollama-bar" id="ollama-bar">
+            <span id="ollama-bar-text">⚡ Checking Ollama connection…</span>
+            <span style="font-size:11px;color:var(--text3)" id="ollama-bar-model"></span>
+          </div>
+          <div class="input-box">
+            <textarea id="chat-input" rows="1" placeholder="Ask about patients, outcomes, medications…" onkeydown="chatKey(event)" oninput="autoResize(this)"></textarea>
+            <button class="send-btn" id="send-btn" onclick="sendMsg()">↑</button>
+          </div>
+          <div class="chat-hint">Powered by Ollama + RAG · <a href="http://localhost:8000/docs" target="_blank">API Docs</a> · <a href="http://localhost:11434" target="_blank">Ollama</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#main -->
+</div><!-- /#app -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script>
+const D=[{"id":1,"age":74.0,"sex":"Male","disp":"WARD","los":21.0,"icu_los":0,"expired":1,"reason":"fever r50 9","intubated":0,"spo2":93.0,"sbp":99.0,"hr":85.0},{"id":2,"age":61.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":88.0,"sbp":122.0,"hr":93.0},{"id":3,"age":58.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":91.0,"sbp":109.0,"hr":73.0},{"id":4,"age":94.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":1,"reason":"suspected covid 19 virus infection u07 2","intubated":0,"spo2":96.0,"sbp":165.0,"hr":92.0},{"id":5,"age":91.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":1,"reason":"febrile respiratory illness j98 9 r50 9","intubated":0,"spo2":95.0,"sbp":131.0,"hr":60.0},{"id":6,"age":44.0,"sex":"Male","disp":"ICU","los":32.0,"icu_los":25.0,"expired":0,"reason":"respiratory failure j96 99","intubated":1,"spo2":65.0,"sbp":130.0,"hr":109.0},{"id":7,"age":50.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":149.0,"hr":130.0},{"id":8,"age":72.0,"sex":"Male","disp":"ICU","los":10.0,"icu_los":4.0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":91.0,"sbp":92.0,"hr":100.0},{"id":9,"age":92.0,"sex":"Female","disp":"WARD","los":11.0,"icu_los":0,"expired":1,"reason":"fever r50 9","intubated":0,"spo2":93.0,"sbp":133.0,"hr":87.0},{"id":10,"age":66.0,"sex":"Female","disp":"ICU","los":29.0,"icu_los":24.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":92.0,"hr":116.0},{"id":11,"age":57.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":111.0,"hr":113.0},{"id":12,"age":76.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":138.0,"hr":60.0},{"id":13,"age":86.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":123.0,"hr":72.0},{"id":14,"age":91.0,"sex":"Female","disp":"WARD","los":33.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":91.0,"sbp":107.0,"hr":109.0},{"id":15,"age":58.0,"sex":"Female","disp":"WARD","los":34.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":142.0,"hr":102.0},{"id":16,"age":56.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":95.0,"sbp":110.0,"hr":83.0},{"id":17,"age":75.0,"sex":"Male","disp":"ICU","los":15.0,"icu_los":14.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":51.0,"sbp":132.0,"hr":110.0},{"id":18,"age":87.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":107.0,"hr":92.0},{"id":19,"age":51.0,"sex":"Male","disp":"WARD","los":11.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":115.0,"hr":109.0},{"id":20,"age":49.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":130.0,"hr":112.0},{"id":21,"age":46.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":118.0,"hr":92.0},{"id":22,"age":47.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":99.0,"sbp":142.0,"hr":97.0},{"id":23,"age":59.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":113.0,"hr":92.0},{"id":24,"age":62.0,"sex":"Male","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":123.0,"hr":109.0},{"id":25,"age":64.0,"sex":"Male","disp":"ICU","los":72.0,"icu_los":45.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":55.0,"sbp":85.0,"hr":97.0},{"id":26,"age":74.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":122.0,"hr":88.0},{"id":27,"age":33.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":2.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":126.0,"hr":101.0},{"id":28,"age":58.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":146.0,"hr":88.0},{"id":29,"age":73.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":163.0,"hr":116.0},{"id":30,"age":80.0,"sex":"Female","disp":"WARD","los":13.0,"icu_los":0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":100.0,"sbp":137.0,"hr":84.0},{"id":31,"age":51.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":130.0,"hr":88.0},{"id":32,"age":55.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":120.0,"hr":91.0},{"id":33,"age":55.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":100.0,"sbp":129.0,"hr":110.0},{"id":34,"age":52.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":185.0,"hr":114.0},{"id":35,"age":32.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":1.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":100.0,"sbp":103.0,"hr":99.0},{"id":36,"age":53.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":113.0,"hr":90.0},{"id":37,"age":69.0,"sex":"Male","disp":"WARD","los":17.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":155.0,"hr":86.0},{"id":38,"age":52.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":119.0,"hr":87.0},{"id":39,"age":73.0,"sex":"Male","disp":"WARD","los":34.0,"icu_los":27.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":90.0,"sbp":145.0,"hr":90.0},{"id":40,"age":73.0,"sex":"Male","disp":"WARD","los":20.0,"icu_los":11.0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":87.0,"sbp":134.0,"hr":91.0},{"id":41,"age":50.0,"sex":"Male","disp":"ICU","los":38.0,"icu_los":23.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":111.0,"hr":108.0},{"id":42,"age":54.0,"sex":"Female","disp":"WARD","los":13.0,"icu_los":3.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":103.0,"hr":104.0},{"id":43,"age":71.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":91.0,"sbp":133.0,"hr":109.0},{"id":44,"age":39.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":116.0,"hr":114.0},{"id":45,"age":56.0,"sex":"Male","disp":"WARD","los":13.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":137.0,"hr":108.0},{"id":46,"age":69.0,"sex":"Female","disp":"WARD","los":19.0,"icu_los":17.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":115.0,"hr":88.0},{"id":47,"age":53.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":99.0,"hr":81.0},{"id":48,"age":59.0,"sex":"Male","disp":"ICU","los":40.0,"icu_los":39.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":90.0,"sbp":186.0,"hr":98.0},{"id":49,"age":68.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":105.0,"hr":105.0},{"id":50,"age":66.0,"sex":"Male","disp":"WARD","los":38.0,"icu_los":17.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":119.0,"hr":86.0},{"id":51,"age":75.0,"sex":"Female","disp":"WARD","los":18.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":99.0,"sbp":136.0,"hr":74.0},{"id":52,"age":41.0,"sex":"Female","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":122.0,"hr":94.0},{"id":53,"age":65.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":151.0,"hr":90.0},{"id":54,"age":34.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":125.0,"hr":102.0},{"id":55,"age":25.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":115.0,"hr":123.0},{"id":56,"age":77.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"cough r05","intubated":0,"spo2":97.0,"sbp":175.0,"hr":71.0},{"id":57,"age":43.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":5.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":79.0,"sbp":130.0,"hr":110.0},{"id":58,"age":47.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":83.0,"sbp":118.0,"hr":79.0},{"id":59,"age":57.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":144.0,"hr":89.0},{"id":60,"age":72.0,"sex":"Male","disp":"WARD","los":12.0,"icu_los":2.0,"expired":1,"reason":"respiratory tract infection j98 8","intubated":0,"spo2":97.0,"sbp":145.0,"hr":96.0},{"id":61,"age":95.0,"sex":"Female","disp":"WARD","los":23.0,"icu_los":0,"expired":0,"reason":"febrile respiratory illness j98 9 r50 9","intubated":0,"spo2":85.0,"sbp":133.0,"hr":82.0},{"id":62,"age":32.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":125.0,"hr":93.0},{"id":63,"age":80.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":99.0,"sbp":95.0,"hr":89.0},{"id":64,"age":59.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":89.0,"sbp":114.0,"hr":120.0},{"id":65,"age":56.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":127.0,"hr":113.0},{"id":66,"age":76.0,"sex":"Male","disp":"ICU","los":12.0,"icu_los":8.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":115.0,"hr":85.0},{"id":67,"age":74.0,"sex":"Female","disp":"ICU","los":8.0,"icu_los":3.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":114.0,"hr":101.0},{"id":68,"age":42.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":123.0,"hr":120.0},{"id":69,"age":81.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":88.0,"sbp":111.0,"hr":114.0},{"id":70,"age":50.0,"sex":"Male","disp":"WARD","los":19.0,"icu_los":6.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":117.0,"hr":110.0},{"id":71,"age":31.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":121.0,"hr":79.0},{"id":72,"age":63.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":137.0,"hr":97.0},{"id":73,"age":41.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":100.0,"sbp":128.0,"hr":103.0},{"id":74,"age":62.0,"sex":"Male","disp":"WARD","los":15.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":135.0,"hr":105.0},{"id":75,"age":54.0,"sex":"Male","disp":"WARD","los":1.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":159.0,"hr":97.0},{"id":76,"age":61.0,"sex":"Female","disp":"WARD","los":17.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":107.0,"hr":98.0},{"id":77,"age":55.0,"sex":"Female","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"coronavirus infection b34 2","intubated":0,"spo2":96.0,"sbp":129.0,"hr":102.0},{"id":78,"age":72.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":100.0,"sbp":131.0,"hr":96.0},{"id":79,"age":57.0,"sex":"Male","disp":"WARD","los":14.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":114.0,"hr":135.0},{"id":80,"age":82.0,"sex":"Male","disp":"WARD","los":17.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":93.0,"hr":65.0},{"id":81,"age":73.0,"sex":"Male","disp":"WARD","los":38.0,"icu_los":33.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":174.0,"hr":110.0},{"id":82,"age":59.0,"sex":"Female","disp":"ICU","los":22.0,"icu_los":7.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":89.0,"sbp":108.0,"hr":101.0},{"id":84,"age":59.0,"sex":"Female","disp":"WARD","los":34.0,"icu_los":14.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":164.0,"hr":101.0},{"id":85,"age":64.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":175.0,"hr":113.0},{"id":86,"age":62.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":108.0,"hr":72.0},{"id":87,"age":74.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":154.0,"hr":104.0},{"id":88,"age":70.0,"sex":"Female","disp":"WARD","los":17.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":153.0,"hr":103.0},{"id":89,"age":73.0,"sex":"Female","disp":"WARD","los":58.0,"icu_los":29.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":91.0,"sbp":103.0,"hr":116.0},{"id":90,"age":69.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":142.0,"hr":86.0},{"id":91,"age":82.0,"sex":"Male","disp":"ICU","los":39.0,"icu_los":12.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":94.0,"hr":110.0},{"id":92,"age":35.0,"sex":"Female","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":108.0,"hr":119.0},{"id":93,"age":41.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":88.0,"sbp":124.0,"hr":106.0},{"id":94,"age":85.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":124.0,"hr":86.0},{"id":95,"age":76.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":115.0,"hr":112.0},{"id":96,"age":83.0,"sex":"Female","disp":"WARD","los":38.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":90.0,"sbp":118.0,"hr":84.0},{"id":97,"age":78.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":131.0,"hr":99.0},{"id":98,"age":59.0,"sex":"Male","disp":"WARD","los":11.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":97.0,"hr":73.0},{"id":99,"age":53.0,"sex":"Male","disp":"WARD","los":16.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":147.0,"hr":109.0},{"id":100,"age":31.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":90.0,"sbp":104.0,"hr":105.0},{"id":101,"age":77.0,"sex":"Male","disp":"WARD","los":25.0,"icu_los":10.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":152.0,"hr":76.0},{"id":102,"age":57.0,"sex":"Female","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":88.0,"sbp":138.0,"hr":140.0},{"id":103,"age":55.0,"sex":"Female","disp":"WARD","los":18.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":90.0,"sbp":112.0,"hr":79.0},{"id":104,"age":56.0,"sex":"Female","disp":"ICU","los":22.0,"icu_los":20.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":99.0,"hr":109.0},{"id":105,"age":93.0,"sex":"Female","disp":"WARD","los":22.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":93.0,"sbp":135.0,"hr":95.0},{"id":106,"age":91.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":1,"reason":"fever r50 9","intubated":0,"spo2":92.0,"sbp":117.0,"hr":107.0},{"id":107,"age":78.0,"sex":"Female","disp":"WARD","los":16.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":95.0,"sbp":147.0,"hr":130.0},{"id":108,"age":50.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":126.0,"hr":92.0},{"id":109,"age":93.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":100.0,"sbp":114.0,"hr":73.0},{"id":110,"age":52.0,"sex":"Male","disp":"WARD","los":11.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":93.0,"sbp":135.0,"hr":119.0},{"id":111,"age":19.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":138.0,"hr":111.0},{"id":112,"age":68.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":127.0,"hr":89.0},{"id":113,"age":64.0,"sex":"Male","disp":"WARD","los":30.0,"icu_los":13.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":102.0,"hr":89.0},{"id":114,"age":74.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":113.0,"hr":84.0},{"id":115,"age":44.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":125.0,"hr":95.0},{"id":116,"age":68.0,"sex":"Male","disp":"WARD","los":37.0,"icu_los":34.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":100.0,"sbp":136.0,"hr":83.0},{"id":117,"age":95.0,"sex":"Male","disp":"WARD","los":11.0,"icu_los":0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":169.0,"hr":74.0},{"id":118,"age":87.0,"sex":"Female","disp":"WARD","los":4.0,"icu_los":0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":87.0,"sbp":122.0,"hr":97.0},{"id":119,"age":89.0,"sex":"Male","disp":"WARD","los":1.0,"icu_los":0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":77.0,"sbp":107.0,"hr":97.0},{"id":120,"age":80.0,"sex":"Male","disp":"WARD","los":42.0,"icu_los":40.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":170.0,"hr":101.0},{"id":121,"age":50.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":134.0,"hr":99.0},{"id":123,"age":79.0,"sex":"Female","disp":"WARD","los":33.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":116.0,"hr":100.0},{"id":124,"age":78.0,"sex":"Male","disp":"ICU","los":20.0,"icu_los":7.0,"expired":0,"reason":"pneumonia j18 9","intubated":1,"spo2":96.0,"sbp":165.0,"hr":102.0},{"id":125,"age":68.0,"sex":"Female","disp":"WARD","los":13.0,"icu_los":4.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":148.0,"hr":102.0},{"id":126,"age":82.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":126.0,"hr":95.0},{"id":127,"age":66.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":126.0,"hr":95.0},{"id":128,"age":85.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":87.0,"sbp":151.0,"hr":76.0},{"id":129,"age":29.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":135.0,"hr":111.0},{"id":131,"age":35.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":3.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":135.0,"hr":115.0},{"id":132,"age":85.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":127.0,"hr":99.0},{"id":133,"age":71.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":134.0,"hr":112.0},{"id":134,"age":71.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":131.0,"hr":106.0},{"id":135,"age":78.0,"sex":"Male","disp":"WARD","los":17.0,"icu_los":13.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":154.0,"hr":100.0},{"id":136,"age":60.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":4.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":145.0,"hr":77.0},{"id":137,"age":72.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":148.0,"hr":82.0},{"id":138,"age":61.0,"sex":"Male","disp":"WARD","los":19.0,"icu_los":8.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":91.0,"sbp":108.0,"hr":77.0},{"id":139,"age":71.0,"sex":"Male","disp":"WARD","los":11.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":179.0,"hr":93.0},{"id":140,"age":71.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":118.0,"hr":109.0},{"id":141,"age":49.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":118.0,"hr":99.0},{"id":142,"age":87.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":136.0,"hr":71.0},{"id":143,"age":91.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":128.0,"hr":102.0},{"id":144,"age":73.0,"sex":"Male","disp":"WARD","los":16.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":133.0,"hr":80.0},{"id":146,"age":50.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":99.0,"sbp":137.0,"hr":62.0},{"id":147,"age":54.0,"sex":"Female","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":157.0,"hr":120.0},{"id":148,"age":73.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":121.0,"hr":70.0},{"id":149,"age":54.0,"sex":"Male","disp":"ICU","los":1.0,"icu_los":0,"expired":1,"reason":"covid 19 u07 1","intubated":1,"spo2":97.0,"sbp":116.0,"hr":87.0},{"id":150,"age":66.0,"sex":"Male","disp":"WARD","los":19.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":127.0,"hr":97.0},{"id":151,"age":48.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":112.0,"hr":105.0},{"id":152,"age":66.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":111.0,"hr":89.0},{"id":153,"age":60.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":146.0,"hr":88.0},{"id":154,"age":81.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":113.0,"hr":110.0},{"id":155,"age":39.0,"sex":"Male","disp":"WARD","los":1.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":125.0,"hr":102.0},{"id":156,"age":89.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":158.0,"hr":72.0},{"id":157,"age":71.0,"sex":"Male","disp":"WARD","los":11.0,"icu_los":8.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":88.0,"sbp":109.0,"hr":92.0},{"id":158,"age":84.0,"sex":"Female","disp":"WARD","los":13.0,"icu_los":11.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":176.0,"hr":107.0},{"id":159,"age":51.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":165.0,"hr":107.0},{"id":160,"age":88.0,"sex":"Male","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":94.0,"sbp":161.0,"hr":95.0},{"id":161,"age":49.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":146.0,"hr":112.0},{"id":162,"age":73.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":89.0,"sbp":150.0,"hr":80.0},{"id":163,"age":72.0,"sex":"Male","disp":"WARD","los":12.0,"icu_los":8.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":104.0,"hr":74.0},{"id":164,"age":56.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":90.0,"sbp":101.0,"hr":100.0},{"id":165,"age":68.0,"sex":"Female","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":148.0,"hr":133.0},{"id":166,"age":71.0,"sex":"Male","disp":"WARD","los":57.0,"icu_los":24.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":182.0,"hr":125.0},{"id":167,"age":36.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":175.0,"hr":115.0},{"id":168,"age":59.0,"sex":"Female","disp":"ICU","los":25.0,"icu_los":12.0,"expired":0,"reason":"covid 19 u07 1","intubated":1,"spo2":54.0,"sbp":99.0,"hr":96.0},{"id":169,"age":76.0,"sex":"Male","disp":"WARD","los":14.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":155.0,"hr":118.0},{"id":170,"age":97.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":89.0,"hr":88.0},{"id":171,"age":85.0,"sex":"Female","disp":"WARD","los":13.0,"icu_los":12.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":89.0,"hr":90.0},{"id":172,"age":72.0,"sex":"Female","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":116.0,"hr":91.0},{"id":173,"age":65.0,"sex":"Male","disp":"WARD","los":12.0,"icu_los":8.0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":95.0,"sbp":119.0,"hr":91.0},{"id":174,"age":82.0,"sex":"Female","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":93.0,"hr":76.0},{"id":176,"age":48.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":114.0,"hr":92.0},{"id":177,"age":68.0,"sex":"Male","disp":"ICU","los":59.0,"icu_los":28.0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":92.0,"sbp":109.0,"hr":73.0},{"id":178,"age":69.0,"sex":"Male","disp":"WARD","los":33.0,"icu_los":25.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":144.0,"hr":90.0},{"id":179,"age":66.0,"sex":"Female","disp":"WARD","los":19.0,"icu_los":7.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":121.0,"hr":71.0},{"id":180,"age":76.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":91.0,"sbp":114.0,"hr":110.0},{"id":181,"age":65.0,"sex":"Female","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":137.0,"hr":99.0},{"id":182,"age":57.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":122.0,"hr":103.0},{"id":183,"age":68.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":134.0,"hr":98.0},{"id":184,"age":55.0,"sex":"Male","disp":"WARD","los":13.0,"icu_los":4.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":118.0,"hr":81.0},{"id":185,"age":48.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":153.0,"hr":99.0},{"id":186,"age":48.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":96.0,"sbp":146.0,"hr":110.0},{"id":187,"age":46.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":134.0,"hr":90.0},{"id":188,"age":74.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":140.0,"hr":80.0},{"id":189,"age":56.0,"sex":"Male","disp":"WARD","los":24.0,"icu_los":16.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":95.0,"hr":76.0},{"id":190,"age":75.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":200.0,"hr":60.0},{"id":191,"age":92.0,"sex":"Female","disp":"WARD","los":13.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":149.0,"hr":99.0},{"id":192,"age":73.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":131.0,"hr":87.0},{"id":193,"age":58.0,"sex":"Female","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":90.0,"sbp":118.0,"hr":100.0},{"id":194,"age":65.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":133.0,"hr":82.0},{"id":195,"age":84.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":99.0,"hr":103.0},{"id":196,"age":79.0,"sex":"Male","disp":"WARD","los":13.0,"icu_los":10.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":90.0,"sbp":122.0,"hr":107.0},{"id":197,"age":48.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":145.0,"hr":109.0},{"id":198,"age":60.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":98.0,"sbp":96.0,"hr":80.0},{"id":199,"age":88.0,"sex":"Male","disp":"WARD","los":23.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":98.0,"sbp":155.0,"hr":70.0},{"id":200,"age":40.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":100.0,"sbp":116.0,"hr":138.0},{"id":201,"age":87.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":1,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":88.0,"sbp":170.0,"hr":100.0},{"id":202,"age":32.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":125.0,"hr":114.0},{"id":203,"age":35.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":6.0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":89.0,"sbp":132.0,"hr":92.0},{"id":204,"age":73.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":98.0,"sbp":112.0,"hr":91.0},{"id":206,"age":47.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":99.0,"sbp":103.0,"hr":67.0},{"id":207,"age":64.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":179.0,"hr":130.0},{"id":208,"age":65.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":126.0,"hr":108.0},{"id":209,"age":76.0,"sex":"Male","disp":"WARD","los":11.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":135.0,"hr":80.0},{"id":210,"age":49.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":91.0,"sbp":147.0,"hr":118.0},{"id":211,"age":95.0,"sex":"Female","disp":"WARD","los":21.0,"icu_los":0,"expired":0,"reason":"febrile respiratory illness j98 9 r50 9","intubated":0,"spo2":97.0,"sbp":109.0,"hr":87.0},{"id":212,"age":64.0,"sex":"Male","disp":"WARD","los":13.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":115.0,"hr":64.0},{"id":213,"age":45.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":136.0,"hr":112.0},{"id":214,"age":80.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":100.0,"sbp":148.0,"hr":75.0},{"id":215,"age":64.0,"sex":"Male","disp":"WARD","los":24.0,"icu_los":7.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":99.0,"sbp":131.0,"hr":98.0},{"id":217,"age":81.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":1.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":188.0,"hr":89.0},{"id":218,"age":86.0,"sex":"Female","disp":"WARD","los":35.0,"icu_los":2.0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":98.0,"sbp":180.0,"hr":91.0},{"id":219,"age":74.0,"sex":"Female","disp":"WARD","los":1.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":123.0,"hr":106.0},{"id":220,"age":56.0,"sex":"Male","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":115.0,"hr":115.0},{"id":221,"age":59.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":96.0,"sbp":171.0,"hr":107.0},{"id":222,"age":77.0,"sex":"Female","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":152.0,"hr":104.0},{"id":223,"age":82.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":134.0,"hr":88.0},{"id":224,"age":44.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":84.0,"sbp":117.0,"hr":88.0},{"id":225,"age":59.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":143.0,"hr":110.0},{"id":226,"age":32.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":2.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":116.0,"hr":103.0},{"id":227,"age":58.0,"sex":"Female","disp":"WARD","los":1.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":120.0,"hr":100.0},{"id":228,"age":72.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":92.0,"sbp":161.0,"hr":100.0},{"id":229,"age":51.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":120.0,"hr":72.0},{"id":230,"age":34.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":126.0,"hr":130.0},{"id":231,"age":64.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":91.0,"sbp":171.0,"hr":104.0},{"id":232,"age":30.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":4.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":104.0,"hr":111.0},{"id":233,"age":65.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":90.0,"sbp":103.0,"hr":80.0},{"id":234,"age":91.0,"sex":"Female","disp":"WARD","los":41.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":104.0,"hr":73.0},{"id":235,"age":68.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":95.0,"sbp":120.0,"hr":60.0},{"id":237,"age":84.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":90.0,"sbp":128.0,"hr":82.0},{"id":238,"age":60.0,"sex":"Female","disp":"WARD","los":34.0,"icu_los":13.0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":92.0,"sbp":136.0,"hr":104.0},{"id":239,"age":60.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":3.0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":90.0,"sbp":132.0,"hr":107.0},{"id":240,"age":73.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":148.0,"hr":106.0},{"id":241,"age":56.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":157.0,"hr":118.0},{"id":242,"age":90.0,"sex":"Female","disp":"WARD","los":6.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":72.0,"sbp":147.0,"hr":106.0},{"id":243,"age":59.0,"sex":"Male","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":100.0,"sbp":143.0,"hr":110.0},{"id":244,"age":44.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":93.0,"sbp":138.0,"hr":96.0},{"id":245,"age":94.0,"sex":"Female","disp":"WARD","los":42.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":130.0,"hr":118.0},{"id":246,"age":57.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":93.0,"sbp":154.0,"hr":103.0},{"id":247,"age":62.0,"sex":"Female","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"respiratory failure j96 99","intubated":0,"spo2":87.0,"sbp":114.0,"hr":140.0},{"id":248,"age":67.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"suspected covid 19 virus infection u07 2","intubated":0,"spo2":96.0,"sbp":118.0,"hr":76.0},{"id":249,"age":79.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":150.0,"hr":88.0},{"id":250,"age":77.0,"sex":"Female","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":94.0,"sbp":111.0,"hr":77.0},{"id":251,"age":64.0,"sex":"Male","disp":"WARD","los":13.0,"icu_los":11.0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":140.0,"hr":107.0},{"id":252,"age":68.0,"sex":"Male","disp":"ICU","los":16.0,"icu_los":9.0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":93.0,"sbp":141.0,"hr":95.0},{"id":253,"age":38.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":114.0,"hr":102.0},{"id":254,"age":65.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"tachypnea r06 8","intubated":0,"spo2":95.0,"sbp":124.0,"hr":62.0},{"id":255,"age":47.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":98.0,"hr":120.0},{"id":256,"age":64.0,"sex":"Male","disp":"WARD","los":15.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":143.0,"hr":115.0},{"id":257,"age":77.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":95.0,"sbp":122.0,"hr":132.0},{"id":258,"age":60.0,"sex":"Female","disp":"WARD","los":53.0,"icu_los":0,"expired":0,"reason":"fever unknown origin r50 9","intubated":0,"spo2":97.0,"sbp":172.0,"hr":137.0},{"id":259,"age":58.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":95.0,"sbp":116.0,"hr":74.0},{"id":260,"age":71.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":94.0,"sbp":102.0,"hr":97.0},{"id":261,"age":48.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"cough r05","intubated":0,"spo2":93.0,"sbp":122.0,"hr":112.0},{"id":262,"age":54.0,"sex":"Female","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":142.0,"hr":111.0},{"id":263,"age":85.0,"sex":"Female","disp":"ICU","los":5.0,"icu_los":4.0,"expired":1,"reason":"pneumonia j18 9","intubated":1,"spo2":100.0,"sbp":110.0,"hr":81.0},{"id":264,"age":59.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"respiratory distress r06 0","intubated":0,"spo2":94.0,"sbp":143.0,"hr":122.0},{"id":265,"age":49.0,"sex":"Female","disp":"ICU","los":15.0,"icu_los":6.0,"expired":0,"reason":"respiratory distress r06 0","intubated":0,"spo2":86.0,"sbp":99.0,"hr":146.0},{"id":266,"age":90.0,"sex":"Male","disp":"WARD","los":81.0,"icu_los":8.0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":100.0,"sbp":134.0,"hr":75.0},{"id":267,"age":77.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":93.0,"sbp":132.0,"hr":129.0},{"id":268,"age":57.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":96.0,"sbp":136.0,"hr":92.0},{"id":269,"age":85.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":127.0,"hr":90.0},{"id":270,"age":41.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":94.0,"sbp":124.0,"hr":101.0},{"id":271,"age":53.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":91.0,"sbp":145.0,"hr":80.0},{"id":272,"age":93.0,"sex":"Male","disp":"WARD","los":18.0,"icu_los":0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":93.0,"hr":91.0},{"id":273,"age":92.0,"sex":"Female","disp":"WARD","los":43.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":92.0,"sbp":147.0,"hr":80.0},{"id":274,"age":82.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":100.0,"sbp":140.0,"hr":82.0},{"id":275,"age":93.0,"sex":"Female","disp":"WARD","los":4.0,"icu_los":0,"expired":1,"reason":"shortness breath r06 0","intubated":0,"spo2":95.0,"sbp":129.0,"hr":76.0},{"id":276,"age":64.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":115.0,"hr":107.0},{"id":277,"age":87.0,"sex":"Male","disp":"WARD","los":29.0,"icu_los":0,"expired":0,"reason":"febrile respiratory illness j98 9 r50 9","intubated":0,"spo2":95.0,"sbp":126.0,"hr":75.0},{"id":278,"age":74.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":134.0,"hr":100.0},{"id":279,"age":75.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":91.0,"sbp":161.0,"hr":89.0},{"id":280,"age":68.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":97.0,"sbp":174.0,"hr":98.0},{"id":281,"age":81.0,"sex":"Female","disp":"WARD","los":21.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":157.0,"hr":94.0},{"id":282,"age":74.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":128.0,"hr":106.0},{"id":283,"age":91.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":1,"reason":"febrile respiratory illness j98 9 r50 9","intubated":0,"spo2":92.0,"sbp":122.0,"hr":97.0},{"id":284,"age":57.0,"sex":"Male","disp":"ICU","los":22.0,"icu_los":9.0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":90.0,"sbp":147.0,"hr":120.0},{"id":285,"age":62.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":90.0,"sbp":126.0,"hr":107.0},{"id":286,"age":90.0,"sex":"Female","disp":"WARD","los":16.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":92.0,"sbp":122.0,"hr":80.0},{"id":287,"age":73.0,"sex":"Female","disp":"WARD","los":35.0,"icu_los":28.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":91.0,"sbp":136.0,"hr":86.0},{"id":288,"age":83.0,"sex":"Male","disp":"WARD","los":12.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":98.0,"sbp":117.0,"hr":64.0},{"id":289,"age":55.0,"sex":"Male","disp":"WARD","los":18.0,"icu_los":12.0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":97.0,"sbp":120.0,"hr":96.0},{"id":290,"age":65.0,"sex":"Male","disp":"WARD","los":16.0,"icu_los":11.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":83.0,"sbp":123.0,"hr":102.0},{"id":291,"age":76.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":95.0,"sbp":133.0,"hr":95.0},{"id":292,"age":56.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":96.0,"sbp":122.0,"hr":98.0},{"id":293,"age":72.0,"sex":"Female","disp":"ICU","los":42.0,"icu_los":40.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":92.0,"sbp":141.0,"hr":103.0},{"id":294,"age":21.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":114.0,"hr":136.0},{"id":295,"age":72.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":95.0,"sbp":119.0,"hr":90.0},{"id":296,"age":54.0,"sex":"Male","disp":"WARD","los":11.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":99.0,"sbp":121.0,"hr":120.0},{"id":297,"age":84.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":90.0,"sbp":128.0,"hr":71.0},{"id":298,"age":94.0,"sex":"Female","disp":"WARD","los":4.0,"icu_los":0,"expired":1,"reason":"shortness breath r06 0","intubated":0,"spo2":94.0,"sbp":145.0,"hr":92.0},{"id":299,"age":59.0,"sex":"Male","disp":"WARD","los":29.0,"icu_los":6.0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":93.0,"sbp":128.0,"hr":102.0},{"id":300,"age":44.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":96.0,"sbp":122.0,"hr":96.0},{"id":301,"age":53.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":96.0,"sbp":114.0,"hr":119.0},{"id":302,"age":95.0,"sex":"Male","disp":"WARD","los":16.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":146.0,"hr":110.0},{"id":303,"age":79.0,"sex":"Male","disp":"ICU","los":42.0,"icu_los":41.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":92.0,"sbp":140.0,"hr":80.0},{"id":304,"age":64.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":177.0,"hr":102.0},{"id":305,"age":50.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"pneumonia due 2019 ncov u07 1 j12 8","intubated":0,"spo2":94.0,"sbp":126.0,"hr":104.0},{"id":306,"age":34.0,"sex":"Female","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":115.0,"hr":125.0},{"id":307,"age":57.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":83.0,"sbp":117.0,"hr":108.0},{"id":308,"age":76.0,"sex":"Female","disp":"WARD","los":14.0,"icu_los":3.0,"expired":1,"reason":"fever r50 9","intubated":0,"spo2":95.0,"sbp":121.0,"hr":104.0},{"id":309,"age":40.0,"sex":"Female","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":90.0,"sbp":99.0,"hr":109.0},{"id":310,"age":46.0,"sex":"Female","disp":"WARD","los":60.0,"icu_los":47.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":90.0,"sbp":94.0,"hr":109.0},{"id":311,"age":56.0,"sex":"Male","disp":"ICU","los":37.0,"icu_los":36.0,"expired":1,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":1,"spo2":66.0,"sbp":184.0,"hr":120.0},{"id":312,"age":76.0,"sex":"Male","disp":"WARD","los":41.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":85.0,"sbp":171.0,"hr":111.0},{"id":313,"age":80.0,"sex":"Male","disp":"WARD","los":26.0,"icu_los":18.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":144.0,"hr":110.0},{"id":314,"age":47.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":112.0,"hr":117.0},{"id":315,"age":57.0,"sex":"Female","disp":"WARD","los":44.0,"icu_los":29.0,"expired":0,"reason":"covid 19 multiple comorbidities u07 1","intubated":0,"spo2":98.0,"sbp":90.0,"hr":90.0},{"id":316,"age":90.0,"sex":"Female","disp":"WARD","los":22.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":100.0,"hr":115.0},{"id":317,"age":62.0,"sex":"Male","disp":"WARD","los":43.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":155.0,"hr":87.0},{"id":318,"age":80.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":92.0,"sbp":129.0,"hr":85.0},{"id":319,"age":76.0,"sex":"Female","disp":"WARD","los":25.0,"icu_los":22.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":77.0,"sbp":92.0,"hr":108.0},{"id":320,"age":78.0,"sex":"Female","disp":"WARD","los":49.0,"icu_los":14.0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":120.0,"hr":85.0},{"id":321,"age":64.0,"sex":"Male","disp":"WARD","los":33.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":91.0,"sbp":100.0,"hr":116.0},{"id":322,"age":74.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":98.0,"sbp":118.0,"hr":87.0},{"id":323,"age":77.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":7.0,"expired":1,"reason":"hypoxia r09 0","intubated":0,"spo2":70.0,"sbp":125.0,"hr":103.0},{"id":325,"age":50.0,"sex":"Male","disp":"ICU","los":9.0,"icu_los":7.0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":93.0,"sbp":151.0,"hr":101.0},{"id":326,"age":92.0,"sex":"Male","disp":"WARD","los":20.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":94.0,"sbp":127.0,"hr":62.0},{"id":327,"age":81.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":1,"reason":"fever r50 9","intubated":0,"spo2":97.0,"sbp":115.0,"hr":71.0},{"id":328,"age":89.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":1,"reason":"fever r50 9","intubated":0,"spo2":95.0,"sbp":85.0,"hr":105.0},{"id":329,"age":68.0,"sex":"Female","disp":"WARD","los":21.0,"icu_los":19.0,"expired":1,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":94.0,"sbp":130.0,"hr":88.0},{"id":330,"age":60.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":89.0,"sbp":109.0,"hr":78.0},{"id":332,"age":73.0,"sex":"Male","disp":"WARD","los":17.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":141.0,"hr":114.0},{"id":333,"age":43.0,"sex":"Female","disp":"ICU","los":11.0,"icu_los":4.0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":95.0,"sbp":109.0,"hr":103.0},{"id":334,"age":92.0,"sex":"Male","disp":"WARD","los":11.0,"icu_los":0,"expired":1,"reason":"fever r50 9","intubated":0,"spo2":99.0,"sbp":137.0,"hr":55.0},{"id":335,"age":58.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":90.0,"sbp":92.0,"hr":106.0},{"id":336,"age":86.0,"sex":"Male","disp":"WARD","los":24.0,"icu_los":0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":88.0,"hr":90.0},{"id":337,"age":62.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":96.0,"sbp":111.0,"hr":87.0},{"id":338,"age":91.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":112.0,"hr":86.0},{"id":339,"age":33.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":93.0,"sbp":106.0,"hr":125.0},{"id":340,"age":36.0,"sex":"Male","disp":"WARD","los":21.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":123.0,"hr":117.0},{"id":341,"age":48.0,"sex":"Female","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"coronavirus infection b34 2","intubated":0,"spo2":96.0,"sbp":131.0,"hr":114.0},{"id":342,"age":86.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":88.0,"sbp":146.0,"hr":104.0},{"id":343,"age":43.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":98.0,"sbp":116.0,"hr":121.0},{"id":344,"age":75.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":90.0,"sbp":152.0,"hr":100.0},{"id":345,"age":65.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":156.0,"hr":81.0},{"id":346,"age":68.0,"sex":"Female","disp":"WARD","los":24.0,"icu_los":0,"expired":0,"reason":"respiratory distress r06 0","intubated":0,"spo2":95.0,"sbp":108.0,"hr":81.0},{"id":347,"age":66.0,"sex":"Male","disp":"WARD","los":23.0,"icu_los":8.0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":124.0,"hr":106.0},{"id":348,"age":65.0,"sex":"Female","disp":"WARD","los":37.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":99.0,"sbp":129.0,"hr":94.0},{"id":349,"age":82.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":112.0,"hr":63.0},{"id":350,"age":59.0,"sex":"Male","disp":"WARD","los":69.0,"icu_los":66.0,"expired":1,"reason":"covid 19 determined clinical diagnostic criteria u","intubated":0,"spo2":93.0,"sbp":144.0,"hr":108.0},{"id":351,"age":70.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"myalgia m79 19","intubated":0,"spo2":95.0,"sbp":115.0,"hr":88.0},{"id":352,"age":73.0,"sex":"Female","disp":"WARD","los":19.0,"icu_los":6.0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":96.0,"sbp":123.0,"hr":106.0},{"id":353,"age":65.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":101.0,"hr":63.0},{"id":354,"age":58.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":82.0,"sbp":148.0,"hr":110.0},{"id":355,"age":34.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":94.0,"sbp":110.0,"hr":115.0},{"id":356,"age":46.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":93.0,"sbp":150.0,"hr":83.0},{"id":357,"age":75.0,"sex":"Male","disp":"WARD","los":14.0,"icu_los":7.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":92.0,"sbp":132.0,"hr":76.0},{"id":358,"age":99.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":1,"reason":"respiratory failure j96 99","intubated":0,"spo2":83.0,"sbp":136.0,"hr":95.0},{"id":359,"age":89.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":137.0,"hr":81.0},{"id":360,"age":84.0,"sex":"Male","disp":"WARD","los":27.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":127.0,"hr":66.0},{"id":361,"age":60.0,"sex":"Male","disp":"ICU","los":12.0,"icu_los":11.0,"expired":1,"reason":"pneumonia j18 9","intubated":1,"spo2":88.0,"sbp":168.0,"hr":108.0},{"id":362,"age":84.0,"sex":"Female","disp":"WARD","los":39.0,"icu_los":0,"expired":0,"reason":"respiratory distress r06 0","intubated":0,"spo2":96.0,"sbp":87.0,"hr":69.0},{"id":363,"age":62.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 virus infection u07 1","intubated":0,"spo2":94.0,"sbp":130.0,"hr":120.0},{"id":364,"age":81.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":89.0,"sbp":144.0,"hr":115.0},{"id":365,"age":89.0,"sex":"Male","disp":"WARD","los":17.0,"icu_los":13.0,"expired":1,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":85.0,"sbp":175.0,"hr":94.0},{"id":366,"age":79.0,"sex":"Male","disp":"WARD","los":36.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":101.0,"hr":70.0},{"id":367,"age":90.0,"sex":"Male","disp":"WARD","los":52.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":121.0,"hr":140.0},{"id":368,"age":70.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":1,"reason":"suspected covid 19 virus infection u07 2","intubated":0,"spo2":93.0,"sbp":145.0,"hr":87.0},{"id":369,"age":82.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":90.0,"sbp":140.0,"hr":70.0},{"id":370,"age":50.0,"sex":"Female","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"suspected covid 19 virus infection u07 2","intubated":0,"spo2":92.0,"sbp":119.0,"hr":98.0},{"id":371,"age":60.0,"sex":"Female","disp":"WARD","los":22.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":93.0,"sbp":99.0,"hr":87.0},{"id":372,"age":80.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":116.0,"hr":71.0},{"id":373,"age":42.0,"sex":"Male","disp":"WARD","los":18.0,"icu_los":0,"expired":0,"reason":"ards adult respiratory distress syndrome j80","intubated":0,"spo2":94.0,"sbp":120.0,"hr":112.0},{"id":374,"age":73.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"respiratory distress r06 0","intubated":0,"spo2":100.0,"sbp":128.0,"hr":102.0},{"id":375,"age":54.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"respiratory distress r06 0","intubated":0,"spo2":95.0,"sbp":227.0,"hr":102.0},{"id":376,"age":79.0,"sex":"Female","disp":"WARD","los":33.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":94.0,"sbp":99.0,"hr":74.0},{"id":377,"age":56.0,"sex":"Female","disp":"WARD","los":15.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":157.0,"hr":101.0},{"id":378,"age":55.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"covid 19 virus infection u07 1","intubated":0,"spo2":96.0,"sbp":103.0,"hr":68.0},{"id":379,"age":64.0,"sex":"Female","disp":"WARD","los":1.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":97.0,"sbp":138.0,"hr":94.0},{"id":380,"age":65.0,"sex":"Female","disp":"WARD","los":15.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":91.0,"sbp":142.0,"hr":113.0},{"id":381,"age":65.0,"sex":"Male","disp":"WARD","los":13.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":142.0,"hr":99.0},{"id":382,"age":78.0,"sex":"Male","disp":"ICU","los":12.0,"icu_los":11.0,"expired":1,"reason":"acquired respiratory distress syndrome j80","intubated":0,"spo2":86.0,"sbp":156.0,"hr":90.0},{"id":383,"age":35.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":127.0,"hr":117.0},{"id":384,"age":100.0,"sex":"Male","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":91.0,"hr":67.0},{"id":385,"age":27.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":96.0,"sbp":141.0,"hr":118.0},{"id":386,"age":78.0,"sex":"Male","disp":"ICU","los":6.0,"icu_los":6.0,"expired":1,"reason":"pneumonia j18 9","intubated":1,"spo2":75.0,"sbp":129.0,"hr":114.0},{"id":387,"age":69.0,"sex":"Male","disp":"WARD","los":25.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":92.0,"sbp":171.0,"hr":95.0},{"id":388,"age":53.0,"sex":"Female","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":92.0,"sbp":125.0,"hr":103.0},{"id":389,"age":66.0,"sex":"Female","disp":"ICU","los":14.0,"icu_los":2.0,"expired":0,"reason":"hypoxemia r09 0","intubated":0,"spo2":69.0,"sbp":149.0,"hr":108.0},{"id":390,"age":33.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":96.0,"sbp":104.0,"hr":118.0},{"id":391,"age":48.0,"sex":"Male","disp":"WARD","los":26.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":141.0,"hr":127.0},{"id":392,"age":67.0,"sex":"Male","disp":"WARD","los":16.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":91.0,"sbp":137.0,"hr":94.0},{"id":393,"age":57.0,"sex":"Male","disp":"WARD","los":25.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":73.0,"sbp":101.0,"hr":99.0},{"id":394,"age":78.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"viral pneumonia j12 9","intubated":0,"spo2":92.0,"sbp":167.0,"hr":94.0},{"id":395,"age":60.0,"sex":"Male","disp":"WARD","los":15.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":98.0,"sbp":124.0,"hr":115.0},{"id":396,"age":70.0,"sex":"Female","disp":"WARD","los":1.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":95.0,"sbp":144.0,"hr":83.0},{"id":397,"age":52.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":85.0,"sbp":167.0,"hr":115.0},{"id":398,"age":64.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":96.0,"sbp":116.0,"hr":92.0},{"id":399,"age":60.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":103.0,"hr":86.0},{"id":400,"age":39.0,"sex":"Female","disp":"WARD","los":13.0,"icu_los":5.0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":90.0,"sbp":131.0,"hr":106.0},{"id":401,"age":98.0,"sex":"Female","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":138.0,"hr":82.0},{"id":402,"age":40.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":154.0,"hr":83.0},{"id":403,"age":60.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":122.0,"hr":89.0},{"id":404,"age":62.0,"sex":"Male","disp":"ICU","los":17.0,"icu_los":12.0,"expired":0,"reason":"respiratory distress r06 0","intubated":1,"spo2":93.0,"sbp":171.0,"hr":106.0},{"id":405,"age":69.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":104.0,"hr":104.0},{"id":406,"age":89.0,"sex":"Male","disp":"WARD","los":28.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":149.0,"hr":85.0},{"id":407,"age":85.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":140.0,"hr":63.0},{"id":408,"age":90.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":96.0,"sbp":115.0,"hr":63.0},{"id":409,"age":94.0,"sex":"Male","disp":"WARD","los":15.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":114.0,"hr":115.0},{"id":410,"age":72.0,"sex":"Female","disp":"WARD","los":16.0,"icu_los":11.0,"expired":1,"reason":"hypoxic r09 0","intubated":0,"spo2":96.0,"sbp":137.0,"hr":101.0},{"id":411,"age":55.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":140.0,"hr":107.0},{"id":412,"age":90.0,"sex":"Male","disp":"WARD","los":19.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":136.0,"hr":46.0},{"id":413,"age":74.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":141.0,"hr":93.0},{"id":414,"age":73.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":99.0,"sbp":194.0,"hr":92.0},{"id":415,"age":60.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":172.0,"hr":85.0},{"id":416,"age":49.0,"sex":"Male","disp":"ICU","los":28.0,"icu_los":17.0,"expired":0,"reason":"respiratory distress r06 0","intubated":0,"spo2":96.0,"sbp":115.0,"hr":127.0},{"id":417,"age":52.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":93.0,"sbp":120.0,"hr":83.0},{"id":418,"age":57.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":4.0,"expired":0,"reason":"respiratory distress r06 0","intubated":0,"spo2":91.0,"sbp":114.0,"hr":129.0},{"id":419,"age":87.0,"sex":"Male","disp":"WARD","los":1.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":93.0,"sbp":124.0,"hr":94.0},{"id":420,"age":59.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":95.0,"sbp":135.0,"hr":101.0},{"id":421,"age":52.0,"sex":"Male","disp":"WARD","los":13.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":96.0,"sbp":131.0,"hr":116.0},{"id":422,"age":30.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"suspected covid 19 virus infection u07 2","intubated":0,"spo2":93.0,"sbp":121.0,"hr":124.0},{"id":423,"age":78.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"febrile respiratory illness j98 9 r50 9","intubated":0,"spo2":98.0,"sbp":136.0,"hr":81.0},{"id":424,"age":98.0,"sex":"Male","disp":"WARD","los":13.0,"icu_los":0,"expired":1,"reason":"hypoxia r09 0","intubated":0,"spo2":92.0,"sbp":154.0,"hr":82.0},{"id":425,"age":84.0,"sex":"Male","disp":"WARD","los":44.0,"icu_los":5.0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":160.0,"hr":107.0},{"id":426,"age":45.0,"sex":"Female","disp":"ICU","los":4.0,"icu_los":3.0,"expired":0,"reason":"respiratory failure j96 99","intubated":1,"spo2":100.0,"sbp":184.0,"hr":138.0},{"id":427,"age":51.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":127.0,"hr":120.0},{"id":428,"age":62.0,"sex":"Female","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"shortness breath exposure covid 19 virus r06 0 u07","intubated":0,"spo2":99.0,"sbp":118.0,"hr":94.0},{"id":429,"age":64.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":143.0,"hr":90.0},{"id":430,"age":72.0,"sex":"Female","disp":"WARD","los":17.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":93.0,"sbp":93.0,"hr":82.0},{"id":431,"age":86.0,"sex":"Male","disp":"WARD","los":14.0,"icu_los":0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":86.0,"sbp":130.0,"hr":97.0},{"id":432,"age":36.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":3.0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":95.0,"sbp":127.0,"hr":128.0},{"id":433,"age":72.0,"sex":"Male","disp":"WARD","los":28.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":122.0,"hr":120.0},{"id":434,"age":79.0,"sex":"Male","disp":"WARD","los":17.0,"icu_los":4.0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":171.0,"hr":98.0},{"id":435,"age":84.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":5.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":93.0,"sbp":113.0,"hr":90.0},{"id":436,"age":64.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":96.0,"sbp":144.0,"hr":103.0},{"id":437,"age":57.0,"sex":"Male","disp":"WARD","los":30.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":93.0,"sbp":143.0,"hr":96.0},{"id":438,"age":52.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":94.0,"sbp":108.0,"hr":115.0},{"id":439,"age":49.0,"sex":"Female","disp":"ICU","los":8.0,"icu_los":4.0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":97.0,"sbp":115.0,"hr":111.0},{"id":440,"age":60.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":97.0,"sbp":135.0,"hr":112.0},{"id":441,"age":80.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":99.0,"hr":117.0},{"id":442,"age":93.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":89.0,"sbp":119.0,"hr":94.0},{"id":443,"age":63.0,"sex":"Male","disp":"WARD","los":32.0,"icu_los":18.0,"expired":1,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":97.0,"sbp":132.0,"hr":93.0},{"id":444,"age":82.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":129.0,"hr":113.0},{"id":445,"age":78.0,"sex":"Male","disp":"ICU","los":24.0,"icu_los":2.0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":94.0,"sbp":115.0,"hr":120.0},{"id":446,"age":84.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":96.0,"sbp":98.0,"hr":98.0},{"id":447,"age":75.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":148.0,"hr":123.0},{"id":448,"age":92.0,"sex":"Female","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":93.0,"sbp":121.0,"hr":68.0},{"id":449,"age":87.0,"sex":"Female","disp":"WARD","los":4.0,"icu_los":0,"expired":1,"reason":"febrile respiratory illness j98 9 r50 9","intubated":0,"spo2":99.0,"sbp":130.0,"hr":83.0},{"id":450,"age":93.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":96.0,"sbp":130.0,"hr":95.0},{"id":451,"age":56.0,"sex":"Female","disp":"WARD","los":13.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":127.0,"hr":90.0},{"id":452,"age":91.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":75.0,"sbp":110.0,"hr":100.0},{"id":453,"age":73.0,"sex":"Female","disp":"ICU","los":10.0,"icu_los":9.0,"expired":1,"reason":"hypoxia r09 0","intubated":1,"spo2":98.0,"sbp":139.0,"hr":110.0},{"id":454,"age":91.0,"sex":"Female","disp":"WARD","los":27.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":96.0,"hr":110.0},{"id":455,"age":79.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":100.0,"sbp":87.0,"hr":41.0},{"id":456,"age":72.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":98.0,"sbp":139.0,"hr":92.0},{"id":457,"age":64.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":90.0,"sbp":134.0,"hr":96.0},{"id":458,"age":82.0,"sex":"Male","disp":"WARD","los":39.0,"icu_los":12.0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":91.0,"sbp":123.0,"hr":102.0},{"id":459,"age":51.0,"sex":"Female","disp":"ICU","los":11.0,"icu_los":8.0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":86.0,"sbp":110.0,"hr":99.0},{"id":460,"age":70.0,"sex":"Female","disp":"WARD","los":25.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":99.0,"sbp":92.0,"hr":98.0},{"id":461,"age":69.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":97.0,"sbp":175.0,"hr":104.0},{"id":462,"age":49.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":93.0,"sbp":102.0,"hr":106.0},{"id":463,"age":53.0,"sex":"Female","disp":"ICU","los":10.0,"icu_los":4.0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":85.0,"sbp":115.0,"hr":78.0},{"id":464,"age":82.0,"sex":"Male","disp":"WARD","los":34.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":97.0,"sbp":134.0,"hr":80.0},{"id":465,"age":79.0,"sex":"Female","disp":"WARD","los":14.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":97.0,"sbp":153.0,"hr":90.0},{"id":466,"age":80.0,"sex":"Male","disp":"ICU","los":31.0,"icu_los":12.0,"expired":0,"reason":"respiratory failure j96 99","intubated":1,"spo2":71.0,"sbp":167.0,"hr":156.0},{"id":467,"age":58.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":98.0,"sbp":92.0,"hr":76.0},{"id":468,"age":82.0,"sex":"Female","disp":"ICU","los":10.0,"icu_los":9.0,"expired":1,"reason":"respiratory failure j96 99","intubated":1,"spo2":85.0,"sbp":156.0,"hr":129.0},{"id":470,"age":56.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":92.0,"sbp":124.0,"hr":93.0},{"id":471,"age":72.0,"sex":"Male","disp":"ICU","los":6.0,"icu_los":6.0,"expired":0,"reason":"respiratory failure j96 99","intubated":1,"spo2":87.0,"sbp":124.0,"hr":102.0},{"id":472,"age":37.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":116.0,"hr":89.0},{"id":473,"age":80.0,"sex":"Female","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":121.0,"hr":77.0},{"id":474,"age":78.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":3.0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":90.0,"sbp":127.0,"hr":91.0},{"id":475,"age":76.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":1,"reason":"shortness breath r06 0","intubated":0,"spo2":93.0,"sbp":101.0,"hr":74.0},{"id":476,"age":69.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":97.0,"sbp":125.0,"hr":102.0},{"id":477,"age":60.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":90.0,"sbp":121.0,"hr":114.0},{"id":478,"age":76.0,"sex":"Female","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":95.0,"sbp":121.0,"hr":95.0},{"id":479,"age":74.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":93.0,"sbp":121.0,"hr":64.0},{"id":480,"age":52.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":92.0,"sbp":88.0,"hr":117.0},{"id":481,"age":67.0,"sex":"Male","disp":"WARD","los":36.0,"icu_los":21.0,"expired":0,"reason":"suspected covid 19 virus infection u07 2","intubated":0,"spo2":96.0,"sbp":134.0,"hr":102.0},{"id":482,"age":80.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":100.0,"hr":90.0},{"id":483,"age":59.0,"sex":"Male","disp":"WARD","los":6.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":98.0,"sbp":164.0,"hr":120.0},{"id":484,"age":61.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":88.0,"sbp":100.0,"hr":75.0},{"id":485,"age":76.0,"sex":"Male","disp":"ICU","los":4.0,"icu_los":4.0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":87.0,"sbp":113.0,"hr":118.0},{"id":486,"age":82.0,"sex":"Male","disp":"WARD","los":26.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":90.0,"sbp":116.0,"hr":116.0},{"id":487,"age":97.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"hypoxia r09 0","intubated":0,"spo2":93.0,"sbp":145.0,"hr":112.0},{"id":488,"age":57.0,"sex":"Female","disp":"ICU","los":4.0,"icu_los":3.0,"expired":0,"reason":"shortness breath r06 0","intubated":1,"spo2":47.0,"sbp":122.0,"hr":47.0},{"id":489,"age":20.0,"sex":"Female","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":104.0,"hr":104.0},{"id":490,"age":74.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":87.0,"sbp":124.0,"hr":85.0},{"id":491,"age":52.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"atypical pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":120.0,"hr":120.0},{"id":492,"age":61.0,"sex":"Female","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":129.0,"hr":97.0},{"id":493,"age":81.0,"sex":"Male","disp":"WARD","los":11.0,"icu_los":4.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":108.0,"hr":64.0},{"id":494,"age":61.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":94.0,"sbp":156.0,"hr":109.0},{"id":495,"age":84.0,"sex":"Female","disp":"WARD","los":14.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":95.0,"hr":97.0},{"id":496,"age":58.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":95.0,"sbp":124.0,"hr":123.0},{"id":497,"age":68.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":94.0,"sbp":128.0,"hr":94.0},{"id":498,"age":90.0,"sex":"Male","disp":"WARD","los":8.0,"icu_los":0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":92.0,"sbp":173.0,"hr":82.0},{"id":499,"age":33.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"atypical pneumonia j18 9","intubated":0,"spo2":90.0,"sbp":129.0,"hr":107.0},{"id":500,"age":71.0,"sex":"Male","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"suspected covid 19 virus infection u07 2","intubated":0,"spo2":91.0,"sbp":151.0,"hr":77.0},{"id":501,"age":64.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":91.0,"sbp":128.0,"hr":112.0},{"id":502,"age":79.0,"sex":"Female","disp":"WARD","los":12.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":100.0,"sbp":115.0,"hr":90.0},{"id":504,"age":78.0,"sex":"Male","disp":"WARD","los":21.0,"icu_los":7.0,"expired":1,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":96.0,"hr":77.0},{"id":505,"age":60.0,"sex":"Male","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"fever r50 9","intubated":0,"spo2":95.0,"sbp":151.0,"hr":103.0},{"id":506,"age":43.0,"sex":"Male","disp":"WARD","los":3.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":94.0,"sbp":134.0,"hr":103.0},{"id":507,"age":74.0,"sex":"Female","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":92.0,"sbp":119.0,"hr":98.0},{"id":508,"age":60.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":124.0,"hr":79.0},{"id":509,"age":51.0,"sex":"Male","disp":"WARD","los":10.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":70.0,"sbp":148.0,"hr":132.0},{"id":510,"age":74.0,"sex":"Male","disp":"ICU","los":12.0,"icu_los":1.0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":96.0,"sbp":107.0,"hr":100.0},{"id":511,"age":63.0,"sex":"Female","disp":"WARD","los":18.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":94.0,"sbp":143.0,"hr":107.0},{"id":512,"age":72.0,"sex":"Male","disp":"WARD","los":11.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":124.0,"hr":96.0},{"id":513,"age":57.0,"sex":"Male","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":95.0,"sbp":142.0,"hr":90.0},{"id":514,"age":68.0,"sex":"Female","disp":"WARD","los":4.0,"icu_los":0,"expired":0,"reason":"pneumonia due covid 19 virus u07 1 j12 8","intubated":0,"spo2":94.0,"sbp":112.0,"hr":109.0},{"id":515,"age":56.0,"sex":"Female","disp":"WARD","los":2.0,"icu_los":0,"expired":0,"reason":"pneumonia j18 9","intubated":0,"spo2":96.0,"sbp":116.0,"hr":93.0},{"id":516,"age":74.0,"sex":"Female","disp":"WARD","los":13.0,"icu_los":0,"expired":0,"reason":"shortness breath r06 0","intubated":0,"spo2":74.0,"sbp":153.0,"hr":98.0},{"id":517,"age":81.0,"sex":"Male","disp":"WARD","los":19.0,"icu_los":6.0,"expired":1,"reason":"covid 19 u07 1","intubated":0,"spo2":84.0,"sbp":161.0,"hr":161.0},{"id":519,"age":74.0,"sex":"Male","disp":"WARD","los":9.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":95.0,"sbp":171.0,"hr":66.0},{"id":521,"age":48.0,"sex":"Female","disp":"WARD","los":7.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":100.0,"sbp":155.0,"hr":95.0},{"id":522,"age":73.0,"sex":"Male","disp":"WARD","los":5.0,"icu_los":0,"expired":0,"reason":"covid 19 u07 1","intubated":0,"spo2":98.0,"sbp":121.0,"hr":86.0}];
+
+// ── Chart defaults ────────────────────────────────────────
+Chart.defaults.color='#8e8ea0';Chart.defaults.borderColor='rgba(255,255,255,.06)';
+Chart.defaults.font.family="'ui-sans-serif','system-ui',sans-serif";Chart.defaults.font.size=11;
+const CHTD=(e={})=>Object.assign({responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#8e8ea0',padding:10,font:{size:11}}},
+           tooltip:{backgroundColor:'#1a1a1a',borderColor:'rgba(255,255,255,.12)',borderWidth:1,titleColor:'#ececec',bodyColor:'#8e8ea0',padding:10}},
+  scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#565869'}},
+          y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#565869'}}}},e);
+
+const CG='#10a37f',CR='#ef4444',CA='#f59e0b',CB='#2d7dd2',CP='#8b5cf6',CC='#06b6d4';
+const PAL=[CB,CG,CA,CR,CP,CC,'#f97316','#84cc16'];
+const charts={};
+
+function mkChart(id,type,data,opts={}){
+  if(charts[id])charts[id].destroy();
+  const ctx=document.getElementById(id);if(!ctx)return;
+  charts[id]=new Chart(ctx,{type,data,options:CHTD(opts)});
+  return charts[id];
+}
+
+// ── Aggregation helpers ────────────────────────────────────
+const ageBins=d=>{
+  const b={'<30':0,'30s':0,'40s':0,'50s':0,'60s':0,'70s':0,'80s':0,'90+':0};
+  d.forEach(r=>{const a=r.age;if(a<30)b['<30']++;else if(a<40)b['30s']++;else if(a<50)b['40s']++;
+    else if(a<60)b['50s']++;else if(a<70)b['60s']++;else if(a<80)b['70s']++;else if(a<90)b['80s']++;else b['90+']++;});
+  return b;
+};
+const losBins=d=>{
+  const b={'1-3':0,'4-7':0,'8-14':0,'15-21':0,'22-30':0,'31+':0};
+  d.forEach(r=>{const l=r.los;if(!l)return;if(l<=3)b['1-3']++;else if(l<=7)b['4-7']++;else if(l<=14)b['8-14']++;
+    else if(l<=21)b['15-21']++;else if(l<=30)b['22-30']++;else b['31+']++;});return b;
+};
+
+// ── Sidebar + navigation ───────────────────────────────────
+let currentView='dashboard';
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed');}
+const VIEW_TITLES={dashboard:'Dashboard',patients:'Patient Explorer',clinical:'Clinical Outcomes',
+  chat:'AI Assistant',predict:'LoS Predictor',architecture:'Architecture'};
+
+function showView(name,el){
+  // Hide non-chat panels
+  document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('view').style.display='block';
+  document.getElementById('chat-view').classList.remove('active');
+  document.getElementById('chat-view').style.display='none';
+
+  if(name==='chat'){
+    document.getElementById('view').style.display='none';
+    document.getElementById('chat-view').style.display='flex';
+    document.getElementById('chat-view').classList.add('active');
+  } else {
+    const panel=document.getElementById('v-'+name);
+    if(panel)panel.classList.add('active');
+    if(name==='clinical')renderClinical();
+    if(name==='patients')renderTable();
+  }
+  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+  if(el)el.classList.add('active');
+  document.getElementById('tb-title').textContent=VIEW_TITLES[name]||name;
+  currentView=name;
+}
+
+// ── KPI update ──────────────────────────────────────────
+function updateKPIs(){
+  const n=D.length,exp=D.filter(r=>r.expired).length,surv=n-exp;
+  const icu=D.filter(r=>r.disp==='ICU').length,intub=D.filter(r=>r.intubated).length;
+  const losArr=D.map(r=>r.los).filter(v=>v>0);
+  const avgLos=(losArr.reduce((a,b)=>a+b,0)/losArr.length).toFixed(1);
+  document.getElementById('k-total').textContent=n;
+  document.getElementById('k-survived').textContent=surv;
+  document.getElementById('k-surv-pct').textContent=`${(surv/n*100).toFixed(1)}% survival`;
+  document.getElementById('k-expired').textContent=exp;
+  document.getElementById('k-mort-pct').textContent=`${(exp/n*100).toFixed(1)}% rate`;
+  document.getElementById('k-icu').textContent=icu;
+  document.getElementById('k-icu-pct').textContent=`${(icu/n*100).toFixed(1)}% of total`;
+  document.getElementById('k-los').textContent=avgLos;
+  document.getElementById('k-intub').textContent=intub;
+  document.getElementById('k-intub-pct').textContent=`${(intub/n*100).toFixed(1)}% ventilated`;
+  // Clinical KPIs
+  const icuD=D.filter(r=>r.disp==='ICU'),wardD=D.filter(r=>r.disp==='WARD');
+  const sorted=[...losArr].sort((a,b)=>a-b);
+  document.getElementById('clin-mort').textContent=`${(exp/n*100).toFixed(1)}%`;
+  document.getElementById('clin-mort-n').textContent=`${exp} of ${n}`;
+  document.getElementById('clin-icu-mort').textContent=icuD.length?`${(icuD.filter(r=>r.expired).length/icuD.length*100).toFixed(1)}%`:'—';
+  document.getElementById('clin-ward-mort').textContent=wardD.length?`${(wardD.filter(r=>r.expired).length/wardD.length*100).toFixed(1)}%`:'—';
+  document.getElementById('clin-intub').textContent=intub;
+  document.getElementById('clin-intub-pct').textContent=`${(intub/n*100).toFixed(1)}% needed ventilation`;
+  document.getElementById('clin-med-los').textContent=sorted[Math.floor(sorted.length/2)]||'—';
+  const icuLos=icuD.map(r=>r.icu_los).filter(v=>v>0);
+  document.getElementById('clin-icu-los').textContent=icuLos.length?(icuLos.reduce((a,b)=>a+b,0)/icuLos.length).toFixed(1):'—';
+}
+
+// ── Dashboard charts ─────────────────────────────────────
+const chartState={};
+function switchChart(group,type,btn){
+  btn.closest('.cc-tabs').querySelectorAll('.cc-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');chartState[group]=type;renderDashboard();
+}
+
+function renderDashboard(){
+  const icu=D.filter(r=>r.disp==='ICU').length,ward=D.filter(r=>r.disp==='WARD').length;
+  const exp=D.filter(r=>r.expired).length,surv=D.length-exp;
+  const dt=chartState['disp']||'doughnut',ot=chartState['outcome']||'doughnut';
+
+  // Disposition
+  if(dt==='doughnut'){
+    mkChart('c-disp','doughnut',{labels:['ICU','Ward'],datasets:[{data:[icu,ward],backgroundColor:[CR,CG],borderWidth:0,hoverOffset:8}]},
+      {scales:{x:{display:false},y:{display:false}},plugins:{legend:{position:'bottom'}}});
+  }else{
+    mkChart('c-disp','bar',{labels:['ICU','Ward'],datasets:[{data:[icu,ward],backgroundColor:[CR,CG],borderRadius:5,borderSkipped:false}]},
+      {plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+  }
+  // Outcome
+  if(ot==='doughnut'){
+    mkChart('c-outcome','doughnut',{labels:['Survived','Expired'],datasets:[{data:[surv,exp],backgroundColor:[CG,CR],borderWidth:0,hoverOffset:8}]},
+      {scales:{x:{display:false},y:{display:false}},plugins:{legend:{position:'bottom'}}});
+  }else{
+    mkChart('c-outcome','bar',{labels:['Survived','Expired'],datasets:[{data:[surv,exp],backgroundColor:[CG,CR],borderRadius:5,borderSkipped:false}]},
+      {plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+  }
+  // Age
+  const ab=ageBins(D);
+  mkChart('c-age','bar',{labels:Object.keys(ab),datasets:[{label:'Patients',data:Object.values(ab),backgroundColor:CB+'bb',borderRadius:5,borderSkipped:false}]},
+    {plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+  // Sex
+  const mw=D.filter(r=>r.sex==='Male'&&r.disp==='WARD').length,mi=D.filter(r=>r.sex==='Male'&&r.disp==='ICU').length;
+  const fw=D.filter(r=>r.sex==='Female'&&r.disp==='WARD').length,fi=D.filter(r=>r.sex==='Female'&&r.disp==='ICU').length;
+  mkChart('c-sex','bar',{labels:['Male','Female'],datasets:[
+    {label:'Ward',data:[mw,fw],backgroundColor:CG+'bb',borderRadius:5,stack:'s'},
+    {label:'ICU', data:[mi,fi],backgroundColor:CR+'bb',borderRadius:5,stack:'s'}
+  ]},{scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true}}});
+  // LoS
+  const lb=losBins(D);
+  mkChart('c-los','bar',{labels:Object.keys(lb),datasets:[{label:'Patients',data:Object.values(lb),
+    backgroundColor:[CC+'bb',CB+'bb',CP+'bb',CA+'bb',CR+'bb','#64748bbb'],borderRadius:5,borderSkipped:false}]},
+    {plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+  // Diagnoses
+  const dx={};
+  D.forEach(r=>{
+    const w=(r.reason||'').split(' ')[0].toLowerCase();
+    const m={'covid':'COVID-19','suspected':'COVID-19','coronavirus':'COVID-19','pneumonia':'Pneumonia',
+      'shortness':'Shortness of Breath','hypoxia':'Hypoxia','fever':'Fever','respiratory':'Resp. Failure','febrile':'Febrile Illness'}[w]||'Other';
+    dx[m]=(dx[m]||0)+1;
+  });
+  const dxArr=Object.entries(dx).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  mkChart('c-dx','bar',{labels:dxArr.map(e=>e[0]),datasets:[{label:'Patients',data:dxArr.map(e=>e[1]),
+    backgroundColor:PAL.map(c=>c+'cc'),borderRadius:5,borderSkipped:false}]},
+    {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{grid:{display:false}}}});
+  // ICU vs Ward mortality
+  const icuD=D.filter(r=>r.disp==='ICU'),wardD=D.filter(r=>r.disp==='WARD');
+  mkChart('c-icu-mort','bar',{labels:['ICU','Ward'],datasets:[
+    {label:'Survived',data:[icuD.filter(r=>!r.expired).length,wardD.filter(r=>!r.expired).length],backgroundColor:CG+'bb',borderRadius:5,stack:'s'},
+    {label:'Expired', data:[icuD.filter(r=>r.expired).length, wardD.filter(r=>r.expired).length], backgroundColor:CR+'bb',borderRadius:5,stack:'s'}
+  ]},{scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true}}});
+  // SpO2
+  const sp={'<85':0,'85-89':0,'90-93':0,'94-96':0,'97-100':0};
+  D.forEach(r=>{const s=r.spo2;if(!s)return;if(s<85)sp['<85']++;else if(s<90)sp['85-89']++;else if(s<94)sp['90-93']++;else if(s<97)sp['94-96']++;else sp['97-100']++;});
+  mkChart('c-spo2','bar',{labels:Object.keys(sp),datasets:[{label:'Patients',data:Object.values(sp),
+    backgroundColor:[CR+'bb',CA+'bb','#f97316bb',CG+'bb',CC+'bb'],borderRadius:5,borderSkipped:false}]},
+    {plugins:{legend:{display:false}},scales:{x:{grid:{display:false},title:{display:true,text:'SpO₂ (%)',color:'#565869'}},y:{beginAtZero:true}}});
+}
+
+// ── Clinical charts ──────────────────────────────────────
+let clinRendered=false;
+function renderClinical(){
+  if(clinRendered)return;clinRendered=true;
+  // LoS detail
+  const lb=losBins(D);
+  mkChart('c-los2','bar',{labels:Object.keys(lb),datasets:[{label:'Patients',data:Object.values(lb),
+    backgroundColor:[CC+'bb',CB+'bb',CP+'bb',CA+'bb',CR+'bb','#64748bbb'],borderRadius:5,borderSkipped:false}]},
+    {plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+  // Scatter
+  const ws=D.filter(r=>r.disp==='WARD'&&r.age&&r.los).map(r=>({x:r.age,y:r.los}));
+  const is=D.filter(r=>r.disp==='ICU'&&r.age&&r.los).map(r=>({x:r.age,y:r.los}));
+  mkChart('c-scatter','scatter',{datasets:[
+    {label:'Ward',data:ws,backgroundColor:CG+'55',borderColor:CG+'99',pointRadius:3},
+    {label:'ICU', data:is, backgroundColor:CR+'77',borderColor:CR+'cc', pointRadius:4}
+  ]},{scales:{x:{title:{display:true,text:'Age',color:'#565869'}},y:{title:{display:true,text:'LoS (days)',color:'#565869'},beginAtZero:true}}});
+  // LoS by age group
+  const ag={},agN={};
+  D.forEach(r=>{if(!r.age||!r.los)return;
+    const b=r.age<40?'<40':r.age<50?'40s':r.age<60?'50s':r.age<70?'60s':r.age<80?'70s':'80+';
+    ag[b]=(ag[b]||0)+r.los;agN[b]=(agN[b]||0)+1;});
+  const agL=['<40','40s','50s','60s','70s','80+'];
+  mkChart('c-los-age','bar',{labels:agL,datasets:[{label:'Avg LoS',data:agL.map(k=>agN[k]?+(ag[k]/agN[k]).toFixed(1):0),
+    backgroundColor:CP+'bb',borderRadius:5,borderSkipped:false}]},
+    {plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,title:{display:true,text:'Days',color:'#565869'}}}});
+  // Sex × outcome
+  const ms=D.filter(r=>r.sex==='Male'&&!r.expired).length,me=D.filter(r=>r.sex==='Male'&&r.expired).length;
+  const fs=D.filter(r=>r.sex==='Female'&&!r.expired).length,fe=D.filter(r=>r.sex==='Female'&&r.expired).length;
+  mkChart('c-sex-out','bar',{labels:['Male','Female'],datasets:[
+    {label:'Survived',data:[ms,fs],backgroundColor:CG+'cc',borderRadius:5,stack:'s'},
+    {label:'Expired', data:[me,fe],backgroundColor:CR+'cc',borderRadius:5,stack:'s'}
+  ]},{scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true}}});
+}
+
+// ── Patient table ────────────────────────────────────────
+let ptPage=1,ptSort={k:'id',d:1},ptSearch='',ptDisp='',ptSex='';
+const PT_PER=20;
+function filterTable(){ptSearch=document.getElementById('pt-search').value.toLowerCase();ptDisp=document.getElementById('f-disp').value;ptSex=document.getElementById('f-sex').value;ptPage=1;renderTable();}
+function sortPt(k){ptSort=ptSort.k===k?{k,d:-ptSort.d}:{k,d:1};renderTable();}
+function renderTable(){
+  let rows=D.filter(r=>{
+    if(ptDisp&&r.disp!==ptDisp)return false;
+    if(ptSex&&r.sex!==ptSex)return false;
+    if(ptSearch&&!`${r.id} ${r.sex} ${r.disp} ${r.reason}`.toLowerCase().includes(ptSearch))return false;
+    return true;
+  }).sort((a,b)=>ptSort.d*((a[ptSort.k]||0)>(b[ptSort.k]||0)?1:(a[ptSort.k]||0)<(b[ptSort.k]||0)?-1:0));
+  const total=rows.length,pages=Math.ceil(total/PT_PER);
+  if(ptPage>pages)ptPage=1;
+  const sl=rows.slice((ptPage-1)*PT_PER,ptPage*PT_PER);
+  document.getElementById('pt-count').textContent=total;
+  document.getElementById('pt-footer').textContent=`Page ${ptPage} of ${pages||1} · ${total} records`;
+  document.getElementById('pt-body').innerHTML=sl.map(r=>`<tr>
+    <td>${r.id}</td><td>${r.age||'—'}</td><td>${r.sex}</td>
+    <td><span class="badge-pill ${r.disp==='ICU'?'bp-icu':'bp-ward'}">${r.disp}</span></td>
+    <td>${r.los||'—'}</td>
+    <td><span class="badge-pill ${r.expired?'bp-dead':'bp-alive'}">${r.expired?'Expired':'Survived'}</span></td>
+    <td>${r.intubated?'<span style="color:#f87171">Yes</span>':'No'}</td>
+    <td>${r.spo2||'—'}${r.spo2?'%':''}</td>
+    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.reason}">${r.reason||'—'}</td>
+  </tr>`).join('');
+  // Pager
+  let pg=`<button onclick="ptGo(${ptPage-1})" ${ptPage===1?'disabled':''}>‹</button>`;
+  const s=Math.max(1,ptPage-2),e=Math.min(pages,ptPage+2);
+  for(let i=s;i<=e;i++)pg+=`<button class="${i===ptPage?'active':''}" onclick="ptGo(${i})">${i}</button>`;
+  pg+=`<button onclick="ptGo(${ptPage+1})" ${ptPage>=pages?'disabled':''}>›</button>`;
+  document.getElementById('pt-pager').innerHTML=pg;
+}
+function ptGo(p){ptPage=p;renderTable();}
+
+function exportCSV(){
+  const h=['id','age','sex','disp','los','icu_los','expired','intubated','spo2','sbp','hr','reason'];
+  const rows=[h.join(','),...D.map(r=>h.map(k=>JSON.stringify(r[k]??'')).join(','))];
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));
+  a.download='medbi_patients.csv';a.click();
+}
+function refreshAll(){renderDashboard();updateKPIs();}
+
+// ── LoS Prediction ───────────────────────────────────────
+async function runPredict(){
+  const payload={
+    age:+document.getElementById('p-age').value,
+    sex:+document.getElementById('p-sex').value,
+    systolic_blood_pressure:+document.getElementById('p-sbp').value,
+    diastolic_blood_pressure:+document.getElementById('p-dbp').value,
+    heart_rate:+document.getElementById('p-hr').value,
+    respiratory_rate:+document.getElementById('p-rr').value,
+    oxygen_saturation:+document.getElementById('p-spo2').value,
+    temperature:+document.getElementById('p-temp').value,
+    icu_admission:+document.getElementById('p-icu').value,
+    intubated:+document.getElementById('p-intub').value
+  };
+  const res=document.getElementById('predict-result');
+  res.style.display='block';res.innerHTML='<span style="color:var(--text3)">⏳ Predicting…</span>';
+  try{
+    const r=await fetch('http://localhost:8000/api/predict/los',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});
+    if(!r.ok)throw new Error(`HTTP ${r.status}`);
+    const d=await r.json();
+    const riskColor=d.risk_level==='High'?'var(--red)':d.risk_level==='Moderate'?'var(--amber)':'var(--accent2)';
+    res.innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      <div style="text-align:center"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Predicted LoS</div><div style="font-size:40px;font-weight:700;color:var(--accent2)">${d.predicted_los_days}</div><div style="font-size:12px;color:var(--text2)">days</div></div>
+      <div style="text-align:center"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Risk Level</div><div style="font-size:24px;font-weight:700;color:${riskColor}">${d.risk_level}</div></div>
+      <div style="text-align:center"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Confidence</div><div style="font-size:16px;font-weight:600;color:var(--text2)">${d.confidence}</div></div>
+    </div>`;
+  }catch(e){
+    // Local fallback
+    const days=payload.icu_admission===1?25.0+( payload.intubated?8:0):10.5+(payload.intubated?8:0);
+    res.innerHTML=`<div style="text-align:center;color:var(--text3);font-size:13px;margin-bottom:12px">⚠️ API offline — using local estimate</div>
+    <div style="text-align:center"><div style="font-size:40px;font-weight:700;color:var(--accent2)">~${days.toFixed(1)}</div><div style="font-size:13px;color:var(--text2)">estimated days</div></div>`;
+  }
+}
+
+// ── Ollama chat ───────────────────────────────────────────
+const API='http://localhost:8000';
+const OLLAMA='http://localhost:11434';
+let ollamaOk=false,apiOk=false;
+const SYSTEM_PROMPT=`You are a medical AI assistant with expertise in COVID-19 inpatient care. 
+You have access to a dataset of 508 COVID-19 patients from Canada Hospital 1 (2020-21).
+Key facts: 508 total patients, 43 ICU (8.5%), 465 Ward, 90 expired (17.7% mortality), 
+avg hospital LoS 12.4 days, 296 male / 212 female.
+Be concise, clinically accurate, and professional. Answer in 2-4 sentences unless more detail is needed.`;
+
+const msgHistory=[{role:'system',content:SYSTEM_PROMPT}];
+
+async function checkStatus(){
+  // Check API
+  try{
+    const r=await fetch(`${API}/health`,{signal:AbortSignal.timeout(3000)});
+    apiOk=r.ok;
+  }catch{apiOk=false;}
+  document.getElementById('api-dot').className='sb-dot '+(apiOk?'green':'red');
+  document.getElementById('api-status').textContent='API: '+(apiOk?'Online':'Offline');
+  document.getElementById('tb-badge').textContent=apiOk?'● LIVE':'● OFFLINE';
+  document.getElementById('tb-badge').style.background=apiOk?'rgba(16,163,127,.15)':'rgba(239,68,68,.1)';
+  document.getElementById('tb-badge').style.color=apiOk?'var(--accent2)':'var(--red)';
+
+  // Check Ollama
+  try{
+    const r=await fetch(`${OLLAMA}/api/tags`,{signal:AbortSignal.timeout(3000)});
+    ollamaOk=r.ok;
+    if(ollamaOk){
+      const data=await r.json();
+      const models=(data.models||[]).map(m=>m.name);
+      if(models.length){
+        const sel=document.getElementById('ollama-model');
+        // Populate available models
+        const existing=[...sel.options].map(o=>o.value);
+        models.forEach(m=>{
+          if(!existing.includes(m)){
+            const opt=document.createElement('option');opt.value=m;opt.textContent=m;
+            sel.insertBefore(opt,sel.options[0]);
+          }
+        });
+        // Auto-select first available
+        if(!existing.includes(models[0])||sel.value==='custom')sel.value=models[0];
+      }
+    }
+  }catch{ollamaOk=false;}
+  document.getElementById('ollama-dot').className='sb-dot '+(ollamaOk?'green':'red');
+  document.getElementById('ollama-status').textContent='Ollama: '+(ollamaOk?'Online':'Offline');
+  const bar=document.getElementById('ollama-bar');
+  if(ollamaOk){
+    bar.classList.remove('offline');
+    bar.querySelector('#ollama-bar-text').textContent='⚡ Ollama connected — streaming enabled';
+    bar.querySelector('#ollama-bar-model').textContent=document.getElementById('ollama-model').value;
+  }else{
+    bar.classList.add('offline');
+    bar.querySelector('#ollama-bar-text').textContent='⚠️ Ollama offline — using built-in knowledge base';
+    bar.querySelector('#ollama-bar-model').textContent='Install: ollama.ai';
+  }
+}
+
+function appendMsg(html,cls,isHtml=false){
+  const wrap=document.getElementById('messages');
+  const isBot=cls.includes('bot');
+  const row=document.createElement('div');row.className='msg-row '+(isBot?'':'user');
+  const av=document.createElement('div');av.className='msg-avatar '+(isBot?'bot':'user-av');
+  av.textContent=isBot?'🏥':'A';
+  const bub=document.createElement('div');bub.className='msg-bubble '+(cls.includes('thinking')?'thinking':'');
+  if(isHtml)bub.innerHTML=html;else bub.textContent=html;
+  if(isBot)row.appendChild(av);
+  row.appendChild(bub);
+  if(!isBot)row.appendChild(av);
+  wrap.appendChild(row);wrap.scrollTop=wrap.scrollHeight;
+  return bub;
+}
+
+async function sendMsg(){
+  const inp=document.getElementById('chat-input');
+  const btn=document.getElementById('send-btn');
+  const msg=inp.value.trim();if(!msg)return;
+  appendMsg(msg,'user');inp.value='';inp.style.height='auto';btn.disabled=true;
+
+  const thinkBub=appendMsg('<span class="dot-anim"><span>●</span><span>●</span><span>●</span></span>','bot thinking',true);
+  msgHistory.push({role:'user',content:msg});
+
+  try{
+    if(ollamaOk){
+      await streamOllama(msg,thinkBub);
+    }else if(apiOk){
+      await callRAGApi(msg,thinkBub);
+    }else{
+      thinkBub.classList.remove('thinking');
+      thinkBub.innerHTML=localKB(msg);
+    }
+  }catch(e){
+    thinkBub.classList.remove('thinking');
+    thinkBub.innerHTML=localKB(msg);
+  }
+  btn.disabled=false;
+  document.getElementById('messages').scrollTop=document.getElementById('messages').scrollHeight;
+}
+
+async function streamOllama(msg,bub){
+  const model=document.getElementById('ollama-model').value;
+  const body=JSON.stringify({model,messages:msgHistory,stream:true,options:{temperature:0.7,num_predict:512}});
+  let fullText='';
+  bub.classList.remove('thinking');bub.textContent='';
+  try{
+    const resp=await fetch(`${OLLAMA}/api/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body});
+    if(!resp.ok)throw new Error('Ollama error');
+    const reader=resp.body.getReader();const dec=new TextDecoder();
+    while(true){
+      const{done,value}=await reader.read();if(done)break;
+      const chunk=dec.decode(value);
+      for(const line of chunk.split('\n')){
+        if(!line.trim())continue;
+        try{
+          const d=JSON.parse(line);
+          if(d.message?.content){fullText+=d.message.content;bub.textContent=fullText;document.getElementById('messages').scrollTop=document.getElementById('messages').scrollHeight;}
+          if(d.done)break;
+        }catch{}
+      }
+    }
+    msgHistory.push({role:'assistant',content:fullText});
+  }catch(e){
+    bub.innerHTML=localKB(msg);
+  }
+}
+
+async function callRAGApi(msg,bub){
+  const r=await fetch(`${API}/api/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg}),signal:AbortSignal.timeout(30000)});
+  if(!r.ok)throw new Error('API error');
+  const d=await r.json();
+  bub.classList.remove('thinking');
+  let html=d.answer.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
+  if(d.sources?.length)html+=`<div class="msg-sources">📎 ${d.source_count} patient records retrieved · Intent: ${d.intent}</div>`;
+  bub.innerHTML=html;
+  msgHistory.push({role:'assistant',content:d.answer});
+}
+
+function localKB(q){
+  const ql=q.toLowerCase();
+  if(ql.includes('mortal')||ql.includes('expir')||ql.includes('died')){
+    const exp=D.filter(r=>r.expired).length,n=D.length;
+    return `📊 <b>Mortality Analysis</b><br>${exp} of ${n} patients expired (${(exp/n*100).toFixed(1)}%).<br>ICU mortality: ${(D.filter(r=>r.disp==='ICU'&&r.expired).length/D.filter(r=>r.disp==='ICU').length*100).toFixed(1)}% vs Ward: ${(D.filter(r=>r.disp==='WARD'&&r.expired).length/D.filter(r=>r.disp==='WARD').length*100).toFixed(1)}%`;
+  }
+  if(ql.includes('icu')){const icu=D.filter(r=>r.disp==='ICU');return `🏥 <b>ICU</b>: ${icu.length} patients (${(icu.length/D.length*100).toFixed(1)}%). Mortality: ${(icu.filter(r=>r.expired).length/icu.length*100).toFixed(1)}%.`;}
+  if(ql.includes('los')||ql.includes('length of stay')||ql.includes('how long')){
+    const l=D.map(r=>r.los).filter(v=>v>0),avg=(l.reduce((a,b)=>a+b,0)/l.length).toFixed(1),med=[...l].sort((a,b)=>a-b)[Math.floor(l.length/2)];
+    return `📅 <b>Length of Stay</b>: Average <b>${avg} days</b>, Median <b>${med} days</b>, Range ${Math.min(...l)}–${Math.max(...l)} days.`;
+  }
+  if(ql.includes('age')){
+    const ages=D.map(r=>r.age).filter(v=>v>0),avg=(ages.reduce((a,b)=>a+b,0)/ages.length).toFixed(1);
+    return `👥 <b>Age Demographics</b>: Mean age <b>${avg} years</b>, Range ${Math.min(...ages)}–${Math.max(...ages)}. Most patients in their 60s–70s.`;
+  }
+  if(ql.includes('sex')||ql.includes('male')||ql.includes('female')||ql.includes('gender')){
+    const m=D.filter(r=>r.sex==='Male').length,f=D.filter(r=>r.sex==='Female').length,n=D.length;
+    return `⚥ <b>Sex Distribution</b>: Male <b>${m}</b> (${(m/n*100).toFixed(1)}%), Female <b>${f}</b> (${(f/n*100).toFixed(1)}%).`;
+  }
+  if(ql.includes('medication')||ql.includes('drug')){
+    return `💊 <b>Top Medications</b>: Rosuvastatin (statin), Metformin (diabetes), Pantoprazole (PPI), Dexamethasone (COVID), Remdesivir (antiviral), Heparin (anticoag).<br><span style="font-size:12px;color:var(--text3)">Start Ollama for AI-powered drug analysis.</span>`;
+  }
+  if(ql.match(/patient\s+(\d+)/i)){
+    const pid=parseInt(ql.match(/\d+/)[0]);const pt=D.find(r=>r.id===pid);
+    if(pt)return `🩺 <b>Patient ${pid}</b>: ${pt.sex}, Age ${pt.age}, ${pt.disp}, LoS ${pt.los}d, <b>${pt.expired?'Expired':'Survived'}</b>, SpO₂ ${pt.spo2}%`;
+    return `Patient ${pid} not found.`;
+  }
+  if(ql.includes('intubat')||ql.includes('ventilat')){
+    const i=D.filter(r=>r.intubated).length;return `🫁 <b>Intubation</b>: ${i} patients (${(i/D.length*100).toFixed(1)}%) required mechanical ventilation.`;
+  }
+  if(ql.includes('summar')||ql.includes('overview')){
+    const n=D.length,exp=D.filter(r=>r.expired).length,icu=D.filter(r=>r.disp==='ICU').length;
+    return `📋 <b>Dataset Summary</b>: ${n} COVID-19 inpatients, ${icu} ICU (${(icu/n*100).toFixed(1)}%), ${n-icu} Ward. Mortality ${(exp/n*100).toFixed(1)}%. Avg LoS 12.4 days. 296 Male / 212 Female.`;
+  }
+  return `🤖 I can answer questions about the <b>508 COVID-19 patients</b>.<br><span style="font-size:12px;color:var(--text3)">Start Ollama (<code>ollama run llama3.2</code>) for full AI responses, or start the API (<code>uvicorn deployment.api:app</code>) for RAG-powered answers.</span>`;
+}
+
+function qs(el){document.getElementById('chat-input').value=el.textContent.trim();sendMsg();}
+function chatKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}}
+function autoResize(t){t.style.height='auto';t.style.height=Math.min(t.scrollHeight,150)+'px';}
+
+// ── Clock ───────────────────────────────────────────────
+setInterval(()=>{document.getElementById('tb-time').textContent=new Date().toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});},1000);
+
+// ── Init ────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',()=>{
+  updateKPIs();
+  renderDashboard();
+  renderTable();
+  checkStatus();
+  setInterval(checkStatus,30000);
+});
+</script>
+</body>
+</html>

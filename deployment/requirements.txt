@@ -1,0 +1,45 @@
+# ── Core API & Web ──────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+websockets>=12.0
+
+# ── LangChain + RAG ─────────────────────────────────────────────
+langchain>=0.2.0
+langchain-community>=0.2.0
+langchain-core>=0.2.0
+chromadb>=0.5.0
+sentence-transformers>=3.0.0
+
+# ── Local LLM (optional – comment out if using Claude/OpenAI API)
+# llama-cpp-python>=0.2.77
+
+# ── ML / Data ───────────────────────────────────────────────────
+scikit-learn>=1.5.0
+pandas>=2.2.0
+numpy>=1.26.0
+joblib>=1.4.0
+
+# ── Medical NLP ─────────────────────────────────────────────────
+# Python 3.12 requires spaCy 3.8+
+spacy>=3.8.0
+# After install run: python -m spacy download en_core_web_sm
+
+# ── Streamlit UI ─────────────────────────────────────────────────
+streamlit>=1.35.0
+plotly>=5.22.0
+
+# ── Auth & Config ────────────────────────────────────────────────
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-dotenv>=1.0.1
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+
+# ── Monitoring ───────────────────────────────────────────────────
+# langfuse>=2.36.0   # Uncomment when ready for production monitoring
+
+# ── Testing ──────────────────────────────────────────────────────
+pytest>=8.2.0
+httpx>=0.27.0
+pytest-asyncio>=0.23.0

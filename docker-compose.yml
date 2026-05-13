@@ -1,0 +1,70 @@
+version: "3.9"
+
+# ── Medical Healthcare Chatbot — Full Stack ──────────────────────────────────
+# Start everything: docker compose up --build
+# API docs:         http://localhost:8000/docs
+# Chatbot UI:       http://localhost:8501
+
+services:
+
+  # ── FastAPI RAG Backend ───────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile
+      target: runtime
+    container_name: medical-chatbot-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data:ro          # read-only data mount
+      - ./models:/app/models:ro      # read-only model mount
+      - vector_store:/app/vector_store  # persisted ChromaDB
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+    command: uvicorn deployment.api:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ── Streamlit Frontend ────────────────────────────────────────────────────
+  ui:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile
+      target: runtime
+    container_name: medical-chatbot-ui
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./images:/app/images:ro
+    environment:
+      - API_URL=http://api:8000
+    command: streamlit run chatbot_v2.py --server.port 8501 --server.address 0.0.0.0
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Ollama (local LLM server) — optional ──────────────────────────────────
+  # Uncomment to run Llama3 locally without downloading model manually
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: medical-chatbot-ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   restart: unless-stopped
+
+volumes:
+  vector_store:
+  # ollama_data:
