@@ -115,6 +115,15 @@ class MedicalRAGPipeline:
             from langchain_community.llms import Ollama
             return Ollama(model=settings.OLLAMA_MODEL, temperature=0.1)
 
+        elif provider == "groq":
+            from langchain_groq import ChatGroq
+            return ChatGroq(
+                model=settings.GROQ_MODEL,
+                api_key=settings.GROQ_API_KEY,
+                temperature=0.1,
+                max_tokens=1024,
+            )
+
         elif provider == "claude":
             from langchain_anthropic import ChatAnthropic
             return ChatAnthropic(
@@ -139,7 +148,7 @@ class MedicalRAGPipeline:
         else:
             raise ValueError(
                 f"Unknown LLM_PROVIDER: '{provider}'. "
-                "Choose: local | ollama | claude | openai"
+                "Choose: local | ollama | groq | claude | openai | mock"
             )
 
     def classify_intent(self, query: str) -> str:
@@ -232,14 +241,6 @@ class MedicalRAGPipeline:
 
 # ── Singleton loader (lazy) ──────────────────────────────────────────────────
 _pipeline: Optional[MedicalRAGPipeline] = None
-
-
-def get_pipeline() -> MedicalRAGPipeline:
-    global _pipeline
-    if _pipeline is None:
-        _pipeline = MedicalRAGPipeline()
-    return _pipeline
-ine] = None
 
 
 def get_pipeline() -> MedicalRAGPipeline:

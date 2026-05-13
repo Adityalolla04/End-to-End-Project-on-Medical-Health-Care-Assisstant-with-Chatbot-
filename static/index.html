@@ -499,7 +499,7 @@ tbody td:first-child{color:var(--text);font-weight:600}
             <textarea id="chat-input" rows="1" placeholder="Ask about patients, outcomes, medications…" onkeydown="chatKey(event)" oninput="autoResize(this)"></textarea>
             <button class="send-btn" id="send-btn" onclick="sendMsg()">↑</button>
           </div>
-          <div class="chat-hint">Powered by Ollama + RAG · <a href="http://localhost:8000/docs" target="_blank">API Docs</a> · <a href="http://localhost:11434" target="_blank">Ollama</a></div>
+          <div class="chat-hint">Powered by Groq + RAG · <a href="/docs" target="_blank">API Docs</a> · <a href="https://console.groq.com" target="_blank">Groq Console</a></div>
         </div>
       </div>
     </div>
@@ -767,7 +767,7 @@ async function runPredict(){
   const res=document.getElementById('predict-result');
   res.style.display='block';res.innerHTML='<span style="color:var(--text3)">⏳ Predicting…</span>';
   try{
-    const r=await fetch('http://localhost:8000/api/predict/los',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});
+    const r=await fetch(`${API}/api/predict/los`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});
     if(!r.ok)throw new Error(`HTTP ${r.status}`);
     const d=await r.json();
     const riskColor=d.risk_level==='High'?'var(--red)':d.risk_level==='Moderate'?'var(--amber)':'var(--accent2)';
@@ -785,8 +785,10 @@ async function runPredict(){
 }
 
 // ── Ollama chat ───────────────────────────────────────────
-const API='http://localhost:8000';
-const OLLAMA='http://localhost:11434';
+// Auto-detect environment: use relative URL on cloud (HF Spaces), localhost when running locally
+const IS_LOCAL=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1';
+const API=IS_LOCAL?'http://localhost:8000':window.location.origin;
+const OLLAMA='http://localhost:11434'; // local only — not available in cloud
 let ollamaOk=false,apiOk=false;
 const SYSTEM_PROMPT=`You are a medical AI assistant with expertise in COVID-19 inpatient care. 
 You have access to a dataset of 508 COVID-19 patients from Canada Hospital 1 (2020-21).
@@ -808,7 +810,10 @@ async function checkStatus(){
   document.getElementById('tb-badge').style.background=apiOk?'rgba(16,163,127,.15)':'rgba(239,68,68,.1)';
   document.getElementById('tb-badge').style.color=apiOk?'var(--accent2)':'var(--red)';
 
-  // Check Ollama
+  // Check Ollama (local only — skipped in cloud deployments)
+  if(!IS_LOCAL){
+    ollamaOk=false;
+  } else
   try{
     const r=await fetch(`${OLLAMA}/api/tags`,{signal:AbortSignal.timeout(3000)});
     ollamaOk=r.ok;
@@ -831,7 +836,7 @@ async function checkStatus(){
     }
   }catch{ollamaOk=false;}
   document.getElementById('ollama-dot').className='sb-dot '+(ollamaOk?'green':'red');
-  document.getElementById('ollama-status').textContent='Ollama: '+(ollamaOk?'Online':'Offline');
+  document.getElementById('ollama-status').textContent=IS_LOCAL?'Ollama: '+(ollamaOk?'Online':'Offline'):'LLM: Groq (cloud)';
   const bar=document.getElementById('ollama-bar');
   if(ollamaOk){
     bar.classList.remove('offline');
@@ -839,8 +844,8 @@ async function checkStatus(){
     bar.querySelector('#ollama-bar-model').textContent=document.getElementById('ollama-model').value;
   }else{
     bar.classList.add('offline');
-    bar.querySelector('#ollama-bar-text').textContent='⚠️ Ollama offline — using built-in knowledge base';
-    bar.querySelector('#ollama-bar-model').textContent='Install: ollama.ai';
+    bar.querySelector('#ollama-bar-text').textContent=IS_LOCAL?'⚠️ Ollama offline — using RAG API':'☁️ Cloud mode — Groq LLM via RAG API';
+    bar.querySelector('#ollama-bar-model').textContent=IS_LOCAL?'Install: ollama.ai':'Groq llama3-8b-8192';
   }
 }
 

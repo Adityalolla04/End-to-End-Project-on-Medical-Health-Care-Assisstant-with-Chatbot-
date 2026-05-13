@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "llama3"
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama3-8b-8192"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     CHROMA_PERSIST_DIR: str = str(VECTOR_STORE_DIR)
     CHROMA_COLLECTION_PATIENTS: str = "patient_records"
